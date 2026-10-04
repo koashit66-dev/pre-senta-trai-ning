@@ -202,13 +202,15 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
         <label>フレーズ間のポーズ <span id="vGap">0.6</span> 秒</label>
         <input type="range" id="gap" min="0" max="3" step="0.1" value="0.6">
         <label>リピート回数</label>
-        <select id="repeatN"><option>1</option><option>2</option><option selected>3</option><option>5</option></select>
+        <select id="repeatN"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>10</option></select>
+        <label>リピートのしかた（↻ ボタン）</label>
+        <select id="repeatScope"><option value="one">いまのフレーズだけを繰り返す</option><option value="each">各フレーズを指定回数ずつ、順に進む</option></select>
         <label><input type="checkbox" id="autoNext" checked> 読み上げ後に自動で次へ進む</label>
         <label><input type="checkbox" id="speakHeads"> 見出し行も読み上げる</label>
         <div id="fileOpts" style="display:none">
           <label>音声ファイルで再生する範囲</label>
           <select id="fileRange"><option value="all">原稿全体</option><option value="sec">いまのセクションだけ</option><option value="star">★ 苦手だけ</option></select>
-          <p class="note">音声ファイル方式では、フレーズ間のポーズやシャドーイングの無音も音声の中に入れて1本にまとめて再生します。そのため画面をロックしても止まらず、ロック画面の「前へ／次へ」ボタンでフレーズを移動できます。リピートは範囲内の<b>各フレーズを指定回数ずつ</b>繰り返します。ポーズ・無音の長さやリピート回数を変えたときは「■ 停止」してから再生し直してください。</p>
+          <p class="note">音声ファイル方式では、フレーズ間のポーズやシャドーイングの無音も音声の中に入れて1本にまとめて再生します。そのため画面をロックしても止まらず、ロック画面の「前へ／次へ」ボタンでフレーズを移動できます。ポーズ・無音の長さ、リピート回数・しかた、範囲を変えると、いまのフレーズの頭から自動で作り直して続けます。</p>
         </div>
       </div>
       <div class="card">
@@ -427,7 +429,7 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
    機密情報はこのファイルに一切含めません。原稿は端末の localStorage のみ。
    ========================================================================= */
 "use strict";
-var APP_VERSION = "v1.2.1 (2026-10-04)";
+var APP_VERSION = "v1.2.2 (2026-10-05)";
 
 /* ---------- エラー表示 ---------- */
 function showErr(msg){
@@ -687,7 +689,7 @@ var ST = {
     silFactor:1, autoRec:false, voiceURI:'', theme:'auto', fs:'2',
     maskMode:'full', showJa:false, wordHl:true, targetMin:20,
     rdNuclide:true, rdUnit:true, rdRules:'',
-    playMode:'tts', fileRange:'all', keepAwake:true, lockText:false, macVoice:'Daniel',
+    playMode:'tts', fileRange:'all', keepAwake:true, lockText:false, macVoice:'Daniel', repeatScope:'one',
     maxWords:12, splitNum:true, splitPrio:true
   }
 };
@@ -1040,16 +1042,40 @@ function playSeq(){
     });
   }
 }
+function repN(){ return Math.max(1, parseInt(ST.cfg.repeatN,10)||1); }
+/* ↻ いまのフレーズだけを n 回（回数は毎回読み直すので、途中で変えても反映される） */
 function playRepeat(){
-  prime(); wakeOn(); SP.stopFlag=false; SP.mode='repeat'; SP.repLeft=+ST.cfg.repeatN||1;
+  prime(); wakeOn(); SP.stopFlag=false; SP.mode='repeat'; SP.repDone=0;
   var ph=phrases()[ST.idx]; if(!ph) return;
+  if(ph.head){ var nb=bodyIdx(function(p,i){ return i>ST.idx; })[0]; if(nb==null) return; ST.idx=nb; ph=phrases()[nb]; }
   renderPractice();
   (function step(){
     if(SP.stopFlag||SP.mode!=='repeat') return;
-    if(SP.repLeft<=0){ SP.mode=null; renderPractice(); return; }
-    setSpeakState('リピート 残り '+SP.repLeft+' 回');
+    var n=repN();
+    if(SP.repDone>=n){ SP.mode=null; setSpeakState('リピート '+n+' 回 終了'); renderPractice(); return; }
+    setSpeakState('リピート '+(SP.repDone+1)+' / '+n+' 回目'); renderPractice();
     speakOne(speakText(ph), function(){
-      bump(ST.idx); SP.repLeft--;
+      bump(ST.idx); SP.repDone++;
+      if(SP.stopFlag||SP.mode!=='repeat') return;
+      SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000));
+    });
+  })();
+}
+/* ↻ 各フレーズを n 回ずつ、順に進む */
+function playRepeatEach(){
+  prime(); wakeOn(); SP.stopFlag=false; SP.mode='repeat'; SP.repDone=0;
+  (function step(){
+    if(SP.stopFlag||SP.mode!=='repeat') return;
+    var list=phrases(), ph=list[ST.idx], n=repN();
+    if(!ph){ SP.mode=null; renderPractice(); return; }
+    if(ph.head || SP.repDone>=n){
+      if(ST.idx>=list.length-1){ SP.mode=null; setSpeakState('最後まで練習しました。'); renderPractice(); return; }
+      ST.idx++; SP.repDone=0; save(); renderPractice();
+      SP.timer=setTimeout(step, ph.head?10:Math.round(ST.cfg.gap*1000)); return;
+    }
+    setSpeakState('リピート '+(SP.repDone+1)+' / '+n+' 回目'); renderPractice();
+    speakOne(speakText(ph), function(){
+      bump(ST.idx); SP.repDone++;
       if(SP.stopFlag||SP.mode!=='repeat') return;
       SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000));
     });
@@ -1334,7 +1360,7 @@ function readAB(f){
 }
 
 /* ---- (2) 音声ファイル方式の再生エンジン ---- */
-var AUD={el:null, url:null, map:[], kind:null, cache:{}, sr:0, lastT:0, building:false, cov:null, after:null, silentUrl:null};
+var AUD={sig:'', repN:0, curK:-1, rebuildT:null, el:null, url:null, map:[], kind:null, cache:{}, sr:0, lastT:0, building:false, cov:null, after:null, silentUrl:null};
 var KIND_L={seq:'通し再生', one:'1フレーズ', repeat:'リピート', shadow:'シャドーイング', ab:'A-B区間'};
 var RANGE_L={all:'原稿全体', sec:'いまのセクション', star:'★ 苦手だけ'};
 function isFile(){ return ST.cfg.playMode==='file'; }
@@ -1385,7 +1411,7 @@ function bodyIdx(filter){ var l=phrases(), out=[]; for(var i=0;i<l.length;i++){ 
 function rangeIndices(kind){
   var l=phrases(), cur=l[ST.idx];
   if(kind==='ab') return bodyIdx(function(p,i){ return i>=SP.abA && i<=SP.abB; });
-  if(kind==='one'){ if(cur&&!cur.head) return [ST.idx]; return bodyIdx(function(p,i){ return i>ST.idx; }).slice(0,1); }
+  if(kind==='one' || (kind==='repeat' && ST.cfg.repeatScope!=='each')){ if(cur&&!cur.head) return [ST.idx]; return bodyIdx(function(p,i){ return i>ST.idx; }).slice(0,1); }
   var r=ST.cfg.fileRange;
   if(r==='sec' && cur) return bodyIdx(function(p){ return p.sec===cur.sec; });
   if(r==='star'){ var st=prog().stars; return bodyIdx(function(p,i){ return !!st[i]; }); }
@@ -1468,11 +1494,12 @@ function syncFromAudio(force){
     for(var k=0;k<AUD.map.length;k++){ var m=AUD.map[k]; if(m.e>AUD.lastT && m.e<=t) bump(m.i); }
     AUD.lastT=t;
   }
-  var seg=AUD.map[curSeg(t)];
-  if(seg && (seg.i!==ST.idx || force)){
-    ST.idx=seg.i;
+  var k=curSeg(t), seg=AUD.map[k];
+  if(seg && (seg.i!==ST.idx || k!==AUD.curK || force)){
+    var moved=(seg.i!==ST.idx);
+    ST.idx=seg.i; AUD.curK=k;
     if(!document.hidden) renderPractice();
-    mediaMeta();
+    if(moved||force) mediaMeta();
   }
 }
 /* フレーズ単位の移動（ロック画面の前へ／次へ と画面の ◀ ▶） */
@@ -1514,6 +1541,7 @@ function filePlay(kind, after){
     var a=audEl();
     if(AUD.url){ try{ URL.revokeObjectURL(AUD.url); }catch(e){} }
     AUD.url=URL.createObjectURL(tr.blob); AUD.map=tr.map; AUD.kind=kind; AUD.after=after||null;
+    AUD.sig=trackSig(kind); AUD.repN=(kind==='repeat')?repN():1; AUD.curK=-1;
     a.loop=(kind==='ab');
     a.src=AUD.url; try{ a.load(); }catch(e){}
     return waitMeta(a).then(function(){
@@ -1527,8 +1555,8 @@ function filePlay(kind, after){
       return a.play();
     }).then(function(){
       wakeOn(); mediaMeta(); posState();
-      setSpeakState(KIND_L[kind]+(kind==='repeat'?'（各フレーズ '+ST.cfg.repeatN+' 回）':'')
-        +' ・ '+(kind==='ab'?'A〜B':kind==='one'?'このフレーズ':RANGE_L[ST.cfg.fileRange])
+      setSpeakState(KIND_L[kind]+(kind==='repeat'?(ST.cfg.repeatScope==='each'?'（各フレーズ '+repN()+' 回ずつ）':'（このフレーズを '+repN()+' 回）'):'')
+        +((kind==='repeat'&&ST.cfg.repeatScope!=='each')?'':' ・ '+(kind==='ab'?'A〜B':kind==='one'?'このフレーズ':RANGE_L[ST.cfg.fileRange]))
         +' ・ 全体 '+mmss(tr.dur*1000/(+ST.cfg.rate||1))
         +(tr.missing?'（未生成 '+tr.missing+' 件はスキップ）':''));
     });
@@ -1539,12 +1567,28 @@ function filePlay(kind, after){
   })
   .then(function(){ AUD.building=false; renderPractice(); });
 }
-/* 同じ種類のトラックが読み込み済みなら一時停止／再開、違えば作り直す */
+/* トラックの組み立て条件。これが変わったら作り直す */
+function trackSig(kind){
+  var one = kind==='one' || (kind==='repeat' && ST.cfg.repeatScope!=='each');
+  return JSON.stringify({k:kind, n:kind==='repeat'?repN():1, sc:ST.cfg.repeatScope, g:+ST.cfg.gap, f:+ST.cfg.silFactor,
+    r:ST.cfg.fileRange, a:SP.abA, b:SP.abB, s:ST.activeId, i:one?ST.idx:null});
+}
+/* 再生中に設定を変えたら、いまのフレーズの頭から作り直して続ける（スライダーは少し待ってから） */
+function rebuildSoon(){
+  if(!AUD.url || !AUD.kind) return;
+  clearTimeout(AUD.rebuildT);
+  AUD.rebuildT=setTimeout(function(){
+    if(!AUD.url || AUD.building || AUD.sig===trackSig(AUD.kind)) return;
+    var wasPlaying=!AUD.el.paused, kind=AUD.kind, after=AUD.after;
+    filePlay(kind, after).then(function(){ if(!wasPlaying && AUD.el) AUD.el.pause(); });
+  }, 450);
+}
+/* 同じ種類・同じ条件のトラックが読み込み済みなら一時停止／再開、違えば作り直す */
 function fileButton(kind){
   audUnlock();
   if(SP.mode) stopSpeak();
   if(AUD.building) return;
-  if(AUD.url && AUD.kind===kind){
+  if(AUD.url && AUD.kind===kind && AUD.sig===trackSig(kind)){
     var a=AUD.el;
     if(a.paused){ var p=a.play(); if(p&&p.catch) p.catch(function(){ setSpeakState('もう一度 ▶ を押してください。'); }); }
     else a.pause();
@@ -1892,6 +1936,12 @@ function renderPractice(){
   if(p.stars[ST.idx]) m.appendChild(el('span','chip','★ 苦手'));
   if(isRead(ph.t)) m.appendChild(el('span','chip','読み替えあり'));
   if(SP.abA!=null) m.appendChild(el('span','chip','A='+(SP.abA+1)+(SP.abB!=null?' B='+(SP.abB+1):'')));
+  if(isFile() && AUD.url && AUD.kind==='repeat' && AUD.map.length){
+    var sg=AUD.map[curSeg(AUD.el.currentTime)];
+    if(sg && sg.i===ST.idx) m.appendChild(el('span','chip pri','リピート '+(sg.r+1)+' / '+AUD.repN));
+  } else if(!isFile() && SP.mode==='repeat'){
+    m.appendChild(el('span','chip pri','リピート '+Math.min(SP.repDone+1,repN())+' / '+repN()));
+  }
   if(REC.on) m.appendChild(el('span','chip pri','● 録音中'));
 
   $('bar').firstChild.style.width = (list.length? (ST.idx+1)/list.length*100 : 0)+'%';
@@ -1920,8 +1970,8 @@ function renderMode(){
   var t='音声ファイル：この原稿 '+c.total+' フレーズ中 '+c.have+' 件あり';
   if(!c.have) t+='\n→「原稿」タブの「音声ファイル」で準備してください';
   else if(c.have<c.total) t+='（未生成 '+(c.total-c.have)+' 件は再生時にスキップ）';
-  if(loaded) t+='\n'+(playing?'再生中':'一時停止中')+'：'+(KIND_L[AUD.kind]||'')+(AUD.kind==='repeat'?'（各フレーズ '+ST.cfg.repeatN+' 回）':'')
-    +' ・ '+(AUD.kind==='ab'?'A〜B':AUD.kind==='one'?'このフレーズ':(RANGE_L[ST.cfg.fileRange]||''));
+  if(loaded) t+='\n'+(playing?'再生中':'一時停止中')+'：'+(KIND_L[AUD.kind]||'')+(AUD.kind==='repeat'?(ST.cfg.repeatScope==='each'?'（各フレーズ '+AUD.repN+' 回ずつ）':'（このフレーズを '+AUD.repN+' 回）'):'')
+    +((AUD.kind==='repeat'&&ST.cfg.repeatScope!=='each')?'':' ・ '+(AUD.kind==='ab'?'A〜B':AUD.kind==='one'?'このフレーズ':(RANGE_L[ST.cfg.fileRange]||'')));
   fs.textContent=t;
   var pk=(AUD.kind==='seq'||AUD.kind==='one');
   $('btnPlay').textContent = AUD.building ? '準備中…' : (playing&&pk ? '‖ 一時停止' : (loaded&&pk ? '▶ 再開' : '▶ 再生'));
@@ -2086,7 +2136,11 @@ document.querySelectorAll('#tabbar button').forEach(function(b){
 function bindCfg(id, key, kind){
   var e=$(id); if(!e) return;
   if(kind==='chk'){ e.checked=!!ST.cfg[key]; e.addEventListener('change',function(){ ST.cfg[key]=e.checked; save(); afterCfg(key); }); }
-  else { e.value=ST.cfg[key]; e.addEventListener('input',function(){ ST.cfg[key]=e.value; save(); afterCfg(key); }); }
+  else {
+    e.value=ST.cfg[key];
+    var on=function(){ if(String(ST.cfg[key])===String(e.value)) return; ST.cfg[key]=e.value; save(); afterCfg(key); };
+    e.addEventListener('input',on); e.addEventListener('change',on);
+  }
 }
 function afterCfg(key){
   if(key==='rate') $('vRate').textContent=(+ST.cfg.rate).toFixed(2);
@@ -2101,6 +2155,7 @@ function afterCfg(key){
   if(key==='keepAwake'){ if(ST.cfg.keepAwake){ if(WL.want) wakeOn(); } else { var w=WL.want; wakeOff(); WL.want=w; } }
   if(key==='lockText') mediaMeta();
   if(key==='fileRange') renderPractice();
+  if(key==='repeatN'||key==='repeatScope'||key==='gap'||key==='silFactor'||key==='fileRange') rebuildSoon();
   if(key==='targetMin') tickClock();
 }
 
@@ -2113,7 +2168,12 @@ $('btnPlay').addEventListener('click', function(){
 $('btnStop').addEventListener('click', function(){ stopSpeak(); stopAudio(); setSpeakState(''); renderPractice(); });
 $('btnNext').addEventListener('click', function(){ if(isFile() && AUD.url){ seekPhrase(1); return; } prime(); stopSpeak(); nextPhrase(); });
 $('btnPrev').addEventListener('click', function(){ if(isFile() && AUD.url){ seekPhrase(-1); return; } prime(); stopSpeak(); prevPhrase(); });
-$('btnRepeat').addEventListener('click', function(){ if(isFile()){ fileButton('repeat'); return; } prime(); stopSpeak(); playRepeat(); });
+$('btnRepeat').addEventListener('click', function(){
+  if(isFile()){ fileButton('repeat'); return; }
+  prime();
+  if(SP.mode==='repeat'){ stopSpeak(); return; }
+  stopSpeak(); if(ST.cfg.repeatScope==='each') playRepeatEach(); else playRepeat();
+});
 $('btnShadow').addEventListener('click', function(){ if(isFile()){ fileButton('shadow'); return; } prime(); if(SP.mode==='shadow'){ stopSpeak(); return; } stopSpeak(); SP.stopFlag=false; playShadow(); });
 document.querySelectorAll('#modeSeg [data-pm]').forEach(function(b){
   b.addEventListener('click', function(){
@@ -2396,7 +2456,7 @@ function init(){
   var l=phrases(); if(ST.idx>=l.length) ST.idx=0;
 
   ['rate','pitch','vol','gap'].forEach(function(k){ bindCfg(k,k); });
-  bindCfg('repeatN','repeatN'); bindCfg('silFactor','silFactor');
+  bindCfg('repeatN','repeatN'); bindCfg('repeatScope','repeatScope'); bindCfg('silFactor','silFactor');
   bindCfg('theme','theme'); bindCfg('fs','fs'); bindCfg('maskMode','maskMode');
   bindCfg('maxWords','maxWords'); bindCfg('targetMin','targetMin');
   bindCfg('autoNext','autoNext','chk'); bindCfg('speakHeads','speakHeads','chk');
@@ -2452,7 +2512,7 @@ window.__pps = {
   toSpeech:toSpeech, readNuclides:readNuclides, readUnits:readUnits, parseRules:parseRules, isNuclide:isNuclide, isRead:isRead,
   WL:WL, wakeOn:wakeOn, wakeOff:wakeOff, IDB:IDB, AUD:AUD, phraseKey:phraseKey, cyrb53:cyrb53, buildAudioList:buildAudioList,
   importAudioFiles:importAudioFiles, buildTrack:buildTrack, filePlay:filePlay, fileButton:fileButton, stopAudio:stopAudio,
-  seekPhrase:seekPhrase, diagnoseAudio:diagnoseAudio, afterImport:afterImport, parseListMeta:parseListMeta, scriptCoverage:scriptCoverage, resplitScript:resplitScript, readZip:readZip, parseWav:parseWav, wavBlob:wavBlob, refreshKeys:refreshKeys, cov:cov, jumpTo:jumpTo
+  seekPhrase:seekPhrase, trackSig:trackSig, repN:repN, diagnoseAudio:diagnoseAudio, afterImport:afterImport, parseListMeta:parseListMeta, scriptCoverage:scriptCoverage, resplitScript:resplitScript, readZip:readZip, parseWav:parseWav, wavBlob:wavBlob, refreshKeys:refreshKeys, cov:cov, jumpTo:jumpTo
 };
 
 init();
