@@ -427,7 +427,7 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
    機密情報はこのファイルに一切含めません。原稿は端末の localStorage のみ。
    ========================================================================= */
 "use strict";
-var APP_VERSION = "v1.2.0 (2026-10-04)";
+var APP_VERSION = "v1.2.1 (2026-10-04)";
 
 /* ---------- エラー表示 ---------- */
 function showErr(msg){
@@ -1617,6 +1617,8 @@ function buildAudioList(){
   var s=activeScript(); if(!s) return null;
   var voice=String(ST.cfg.macVoice||'').replace(/[\r\n\t]/g,' ').trim()||'Daniel';
   var lines=['# pps-audio-list v1','# script: '+String(s.name).replace(/[\r\n]/g,' '),'# voice: '+voice,'# rate: ',
+    '# split: maxWords='+(s.opt?(+s.opt.maxWords||0):12)+' num='+((s.opt&&s.opt.num===false)?0:1)+' prio='+((s.opt&&s.opt.prio===false)?0:1),
+    '# read: nuclide='+(ST.cfg.rdNuclide?1:0)+' unit='+(ST.cfg.rdUnit?1:0)+(ST.cfg.rdRules?' rules=custom':''),
     '# created: '+new Date().toISOString(),'# app: '+APP_VERSION,
     '# 形式: 番号<TAB>ID<TAB>読み上げ文。このファイルは原稿の内容を含むので GitHub に上げないこと。'];
   var seen={}, n=0;
@@ -1636,13 +1638,106 @@ function renderAudioCard(extra){
   var msg=(extra?extra+'\n':'')+'この原稿：'+c.total+' フレーズ中 '+c.have+' 件の音声あり'
     +(c.total&&c.have<c.total?'（未生成 '+(c.total-c.have)+' 件。再生時はスキップ）':'')
     +'\n端末に保存済みの音声：全 '+all+' 件';
+  if(ST.scripts.length>1 && IDB.keys && IDB.keys.size){
+    msg+='\n\n原稿ごと（音声あり / フレーズ数・分割設定）：';
+    ST.scripts.forEach(function(sc){ var x=scriptCoverage(sc); msg+='\n・'+sc.name+'：'+x.have+' / '+x.total+'・'+splitLabel(sc.opt?sc.opt.maxWords:12); });
+  }
   e.textContent=msg;
+}
+
+/* ---- 照合ずれの診断（v1.2.1） ----
+   音声は「読み上げる文」ごとの ID で照合する。リストを書き出したときと分割設定が違うと文が変わり、
+   照合できない。取り込んだ音声の ID から、どの原稿をどの設定で分割したものかを推定する。 */
+function splitLabel(mw){ return +mw ? (+mw)+'語' : '分割しない'; }
+function scriptCoverage(sc, K){
+  var have=0, total=0;
+  sc.phrases.forEach(function(ph){ if(ph.head) return; total++; var k=phraseKey(ph); if(K ? K.has(k) : (IDB.keys && IDB.keys.has(k))) have++; });
+  return {have:have, total:total};
+}
+function keysUnder(raw, o){
+  var sv={rdNuclide:ST.cfg.rdNuclide, rdUnit:ST.cfg.rdUnit}, out=[];
+  try{
+    ST.cfg.rdNuclide=o.nuclide; ST.cfg.rdUnit=o.unit;
+    flatten(parseScript(raw,{maxWords:o.maxWords, num:o.num, prio:o.prio})).forEach(function(ph){ if(!ph.head) out.push(phraseKey(ph)); });
+  } finally { ST.cfg.rdNuclide=sv.rdNuclide; ST.cfg.rdUnit=sv.rdUnit; }
+  return out;
+}
+function parseListMeta(t){
+  if(!t) return null;
+  var m={}; String(t).split(/\r?\n/).forEach(function(l){ var x=l.match(/^#\s*([a-z]+):\s*(.*)$/i); if(x && !(x[1] in m)) m[x[1]]=x[2].trim(); });
+  var o={script:m.script||'', split:null, read:null};
+  if(m.split){ var a=m.split.match(/maxWords=(\d+)/), b=m.split.match(/num=(\d)/), c=m.split.match(/prio=(\d)/);
+    if(a) o.split={maxWords:+a[1], num:b?b[1]==='1':true, prio:c?c[1]==='1':true}; }
+  if(m.read){ var d=m.read.match(/nuclide=(\d)/), e=m.read.match(/unit=(\d)/); o.read={nuclide:d?d[1]==='1':true, unit:e?e[1]==='1':true}; }
+  return o;
+}
+function diagnoseAudio(K, meta){
+  var per=ST.scripts.map(function(sc){ var c=scriptCoverage(sc,K); return {sc:sc, have:c.have, total:c.total}; });
+  var byName = meta && meta.script ? per.filter(function(x){ return x.sc.name===meta.script; })[0] : null;
+  var best = per.slice().sort(function(a,b){ return b.have-a.have; })[0];
+  var tgt = byName || best, res={per:per, target:tgt, alt:null};
+  if(!tgt) return res;
+  var need=Math.min(tgt.total, K.size);
+  if(tgt.have>0 && tgt.have>=Math.floor(need*0.9)) return res;          /* 十分に対応している */
+  var cands=[], cur={num:!!ST.cfg.splitNum, prio:!!ST.cfg.splitPrio, nuclide:!!ST.cfg.rdNuclide, unit:!!ST.cfg.rdUnit};
+  if(meta && meta.split) cands.push({maxWords:meta.split.maxWords, num:meta.split.num, prio:meta.split.prio,
+    nuclide: meta.read? meta.read.nuclide : cur.nuclide, unit: meta.read? meta.read.unit : cur.unit});
+  [0,8,12,20].forEach(function(mw){
+    [[cur.nuclide,cur.unit],[true,true],[false,false],[true,false],[false,true]].forEach(function(rd){
+      cands.push({maxWords:mw, num:cur.num, prio:cur.prio, nuclide:rd[0], unit:rd[1]});
+    });
+  });
+  var seen={}, alt=null;
+  cands.forEach(function(o){
+    var sig=JSON.stringify(o); if(seen[sig]) return; seen[sig]=1;
+    var ks=keysUnder(tgt.sc.raw, o), h=0; ks.forEach(function(k){ if(K.has(k)) h++; });
+    if(!alt || h>alt.have) alt={o:o, have:h, total:ks.length};
+  });
+  if(alt && alt.have>tgt.have) res.alt=alt;
+  return res;
+}
+/* 原稿を指定の設定で分割し直す（ID は保つ。練習回数・★はフレーズ番号が変わるのでリセット） */
+function resplitScript(sc, o){
+  ST.cfg.maxWords=o.maxWords; ST.cfg.splitNum=o.num; ST.cfg.splitPrio=o.prio; ST.cfg.rdNuclide=o.nuclide; ST.cfg.rdUnit=o.unit;
+  try{ $('maxWords').value=String(o.maxWords); $('splitNum').checked=o.num; $('splitPrio').checked=o.prio; $('rdNuclide').checked=o.nuclide; $('rdUnit').checked=o.unit; }catch(e){}
+  var built=buildScript(sc.name, sc.raw); built.id=sc.id;
+  for(var i=0;i<ST.scripts.length;i++) if(ST.scripts[i].id===sc.id) ST.scripts[i]=built;
+  var old=ST.prog[sc.id]; ST.prog[sc.id]={counts:{},stars:{},secTime:{},total:(old&&old.total)||0};
+  ST.activeId=sc.id; ST.idx=firstBody(built); SP.abA=SP.abB=null;
+  stopAudio(); save(); AUD.cov=null; renderAll();
+  return built;
+}
+/* 取り込み後の案内（原稿ごとの件数、必要なら再分割・切替） */
+function afterImport(r){
+  if(!r.imported){
+    alert('音声ファイルが見つかりませんでした。\n音声ファイルは「14桁の英数字.wav」という名前である必要があります。'
+      +(r.names&&r.names.length?'\n\n選んだファイル／ZIP の中身（先頭）：\n・'+r.names.join('\n・'):''));
+    renderAudioCard('取り込み：音声ファイルが見つかりませんでした'); return;
+  }
+  var K=new Set(r.keys), meta=parseListMeta(r.listText), d=diagnoseAudio(K, meta), note='';
+  if(d.alt && d.target){
+    var o=d.alt.o, curMw=d.target.sc.opt ? d.target.sc.opt.maxWords : ST.cfg.maxWords;
+    var rdDiff=(o.nuclide!==!!ST.cfg.rdNuclide)||(o.unit!==!!ST.cfg.rdUnit);
+    var q='取り込んだ音声は、原稿「'+d.target.sc.name+'」を\n'
+      +'「1フレーズの最大語数：'+splitLabel(o.maxWords)+'」'+(rdDiff?'（読み替え設定も異なる）':'')+' で分割して作られています。\n'
+      +'いまの原稿は「'+splitLabel(curMw)+'」で分割されているため、音声が '+d.target.have+' / '+d.target.total+' 件しか対応していません。\n\n'
+      +'同じ設定で分割し直すと、'+d.alt.have+' / '+d.alt.total+' 件の音声が使えます。分割し直しますか？\n'
+      +'（この原稿の手動の結合・分割、練習回数、★ はリセットされます）';
+    if(confirm(q)){ resplitScript(d.target.sc, o); note='\n原稿「'+d.target.sc.name+'」を「'+splitLabel(o.maxWords)+'」で分割し直し、選択しました。'; }
+  } else if(d.target && d.target.have>0 && d.target.sc.id!==ST.activeId){
+    stopAudio(); ST.activeId=d.target.sc.id; ST.idx=firstBody(d.target.sc); SP.abA=SP.abB=null; save(); AUD.cov=null; renderAll();
+    note='\n対応する原稿「'+d.target.sc.name+'」に切り替えました。';
+  }
+  var lines=ST.scripts.map(function(sc){ var c=scriptCoverage(sc); return '・'+sc.name+'：'+c.have+' / '+c.total+(sc.id===ST.activeId?'（選択中）':''); });
+  alert('音声を '+r.imported+' 件取り込みました。'+note+'\n\n原稿ごとの音声（音声あり / フレーズ数）：\n'+lines.join('\n')
+    +(lines.some(function(l){ return / 0 \/ /.test(l); }) ? '\n\n0 件の原稿は、その原稿の音声 ZIP をまだ取り込んでいないか、分割設定が違います。' : ''));
+  renderAudioCard('取り込み完了：'+r.imported+' 件'); renderPractice();
 }
 
 /* ---- 取り込み ---- */
 var AUDIO_NAME=/([0-9a-f]{14})\.(wav|wave|m4a|mp3|aif|aiff|caf)$/i;
 function importAudioFiles(files){
-  var items=[], skipped=0, bad=[];
+  var items=[], skipped=0, bad=[], names=[], listText='', txts=[];
   setAudioStat('取り込み中…');
   var chain=Promise.resolve();
   files.forEach(function(f){
@@ -1653,7 +1748,8 @@ function importAudioFiles(files){
           var nm=e.name.split('/').pop();
           if(!nm || /(^|\/)__MACOSX\//.test(e.name) || /^\._/.test(nm)) return;
           var m=nm.match(AUDIO_NAME);
-          if(!m){ if(!/\.txt$/i.test(nm)) skipped++; return; }
+          if(names.length<8) names.push(nm);
+          if(!m){ if(/\.txt$/i.test(nm)) txts.push(e); else skipped++; return; }
           sub=sub.then(function(){ return inflateEntry(e); }).then(function(buf){
             items.push({k:m[1].toLowerCase(), v:{buf:buf, name:nm, size:buf.byteLength, t:Date.now()}});
           });
@@ -1661,11 +1757,16 @@ function importAudioFiles(files){
         return sub;
       }
       var m2=f.name.match(AUDIO_NAME);
-      if(!m2){ skipped++; bad.push(f.name); return; }
+      if(names.length<8) names.push(f.name);
+      if(!m2){ if(/\.txt$/i.test(f.name) && !listText){ try{ listText=new TextDecoder('utf-8').decode(ab); }catch(e){} } else { skipped++; bad.push(f.name); } return; }
       items.push({k:m2[1].toLowerCase(), v:{buf:ab, name:f.name, size:ab.byteLength, t:Date.now()}});
     });
   });
   return chain.then(function(){
+    /* 同梱の音声リスト（v1.2.1 以降の Mac スクリプトが入れる）を読む */
+    if(listText || !txts.length) return;
+    return inflateEntry(txts[0]).then(function(buf){ try{ listText=new TextDecoder('utf-8').decode(buf); }catch(e){} }).catch(function(){});
+  }).then(function(){
     var p=Promise.resolve();
     for(var i=0;i<items.length;i+=20){ (function(b){ p=p.then(function(){ return idbPutMany(b); }); })(items.slice(i,i+20)); }
     return p;
@@ -1678,7 +1779,7 @@ function importAudioFiles(files){
     var c=cov();
     var msg='取り込み完了：'+items.length+' 件'+(skipped?'（音声ファイル名でないもの '+skipped+' 件は無視）':'');
     renderAudioCard(msg); renderPractice();
-    return {imported:items.length, skipped:skipped, have:c.have, total:c.total};
+    return {imported:items.length, skipped:skipped, have:c.have, total:c.total, keys:items.map(function(it){ return it.k; }), names:names, listText:listText};
   }).catch(function(e){
     renderAudioCard('取り込みに失敗しました: '+((e&&e.message)||e));
     throw e;
@@ -1840,7 +1941,7 @@ function renderScriptList(){
     var d=el('div','item'+(s.id===ST.activeId?' cur':''));
     var t=el('div','t');
     t.appendChild(el('div',null,s.name));
-    t.appendChild(el('div','note', s.secTitles.length+' セクション / '+s.phrases.length+' フレーズ'));
+    t.appendChild(el('div','note', s.secTitles.length+' セクション / '+s.phrases.length+' フレーズ / 最大語数：'+splitLabel(s.opt?s.opt.maxWords:12)));
     d.appendChild(t);
     var ops=el('div','ops');
     var b1=el('button','btn sm','選択'); b1.onclick=function(ev){ ev.stopPropagation(); ST.activeId=s.id; ST.idx=firstBody(s); SP.abA=SP.abB=null; save(); renderAll(); go('practice'); };
@@ -2099,9 +2200,7 @@ $('audioIn').addEventListener('change', function(){
   var files=[].slice.call(this.files||[]); this.value='';
   if(!files.length) return;
   stopAudio();
-  importAudioFiles(files).then(function(r){
-    alert('音声を取り込みました。\nこの原稿：'+r.total+' フレーズ中 '+r.have+' 件の音声あり'+(r.have<r.total?'\n（未生成 '+(r.total-r.have)+' 件は再生時にスキップされます）':''));
-  }).catch(function(e){ alert('取り込みに失敗しました。\n'+((e&&e.message)||e)); });
+  importAudioFiles(files).then(afterImport).catch(function(e){ alert('取り込みに失敗しました。\n'+((e&&e.message)||e)); });
 });
 $('btnDelScriptAudio').addEventListener('click', function(){
   var s=activeScript(); if(!s) return;
@@ -2353,7 +2452,7 @@ window.__pps = {
   toSpeech:toSpeech, readNuclides:readNuclides, readUnits:readUnits, parseRules:parseRules, isNuclide:isNuclide, isRead:isRead,
   WL:WL, wakeOn:wakeOn, wakeOff:wakeOff, IDB:IDB, AUD:AUD, phraseKey:phraseKey, cyrb53:cyrb53, buildAudioList:buildAudioList,
   importAudioFiles:importAudioFiles, buildTrack:buildTrack, filePlay:filePlay, fileButton:fileButton, stopAudio:stopAudio,
-  seekPhrase:seekPhrase, readZip:readZip, parseWav:parseWav, wavBlob:wavBlob, refreshKeys:refreshKeys, cov:cov, jumpTo:jumpTo
+  seekPhrase:seekPhrase, diagnoseAudio:diagnoseAudio, afterImport:afterImport, parseListMeta:parseListMeta, scriptCoverage:scriptCoverage, resplitScript:resplitScript, readZip:readZip, parseWav:parseWav, wavBlob:wavBlob, refreshKeys:refreshKeys, cov:cov, jumpTo:jumpTo
 };
 
 init();
