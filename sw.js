@@ -2,7 +2,7 @@
    目的：ホーム画面に追加したあと、オフラインでも起動できるようにする。
    方針：アプリ本体だけをキャッシュする。原稿データは localStorage なので触らない。
    更新：index.html を差し替えたら CACHE の版数（v1 → v2 …）を上げてアップロードする。 */
-var CACHE = 'pps-v2';
+var CACHE = 'pps-v3';
 var ASSETS = [
   './',
   './index.html',

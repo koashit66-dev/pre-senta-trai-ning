@@ -76,6 +76,8 @@ button,select,input,textarea{font-family:inherit;font-size:1em;color:var(--fg)}
 .btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn[disabled]{opacity:.42}
 .row{display:flex;gap:7px;flex-wrap:wrap}
+.seg{display:flex;gap:6px}
+.seg>.btn{flex:1 1 0;min-width:0}
 .row>.btn{flex:1 1 auto}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
@@ -161,6 +163,11 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
         <div id="meta"></div>
         <div id="speakState"></div>
       </div>
+      <div class="seg" id="modeSeg" style="margin-top:10px">
+        <button class="btn sm" data-pm="tts">読み上げ（端末の音声）</button>
+        <button class="btn sm" data-pm="file">音声ファイル（ロック中も再生）</button>
+      </div>
+      <div class="note" id="fileStatus" style="display:none;margin-top:6px;white-space:pre-line"></div>
       <div class="row" style="margin-top:10px">
         <button class="btn" id="btnPrev">◀ 前</button>
         <button class="btn pri" id="btnPlay" style="flex:2 1 auto">▶ 読み上げ</button>
@@ -198,6 +205,11 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
         <select id="repeatN"><option>1</option><option>2</option><option selected>3</option><option>5</option></select>
         <label><input type="checkbox" id="autoNext" checked> 読み上げ後に自動で次へ進む</label>
         <label><input type="checkbox" id="speakHeads"> 見出し行も読み上げる</label>
+        <div id="fileOpts" style="display:none">
+          <label>音声ファイルで再生する範囲</label>
+          <select id="fileRange"><option value="all">原稿全体</option><option value="sec">いまのセクションだけ</option><option value="star">★ 苦手だけ</option></select>
+          <p class="note">音声ファイル方式では、フレーズ間のポーズやシャドーイングの無音も音声の中に入れて1本にまとめて再生します。そのため画面をロックしても止まらず、ロック画面の「前へ／次へ」ボタンでフレーズを移動できます。リピートは範囲内の<b>各フレーズを指定回数ずつ</b>繰り返します。ポーズ・無音の長さやリピート回数を変えたときは「■ 停止」してから再生し直してください。</p>
+        </div>
       </div>
       <div class="card">
         <h2>シャドーイング</h2>
@@ -214,7 +226,8 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
   <div class="warn" style="margin-top:10px">
-    音が出ないときは、①本体側面の<b>サイレントスイッチ（消音）を解除</b>、②音量を上げる、③画面を一度タップしてから「▶ 読み上げ」を押す、を確認してください。iOS では<b>タップ操作がないと読み上げを開始できません</b>。
+    音が出ないときは、①本体側面の<b>サイレントスイッチ（消音）を解除</b>、②音量を上げる、③画面を一度タップしてから「▶ 読み上げ」を押す、を確認してください。iOS では<b>タップ操作がないと読み上げを開始できません</b>。<br>
+    「読み上げ」方式は<b>画面をロックすると止まります</b>（iOS の仕様）。ロック中も聞きたいときは「音声ファイル」方式に切り替えてください（準備は「原稿」タブ）。
   </div>
 </section>
 
@@ -252,6 +265,31 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
       <button class="btn" id="btnShowSplit">分割結果を確認・修正</button>
     </div>
     <p class="note">再分割すると手動修正（結合／分割）はリセットされます。練習回数と★は維持されません（フレーズ番号が変わるため）。</p>
+  </div>
+  <div class="card" id="audioCard">
+    <h2>音声ファイル（ロック中も再生するための準備）</h2>
+    <p class="note">端末の読み上げは画面ロックで止まります。Mac で音声ファイルを作ってここに取り込むと、練習タブの「音声ファイル」方式でロック中も再生できます。<b>音声には原稿の内容がそのまま入るので、GitHub には上げないでください。</b></p>
+    <ol class="note" style="padding-left:1.3em;margin:6px 0 4px">
+      <li>「① リストを書き出す」で、この原稿の音声生成用リストを Mac に送る（AirDrop など）</li>
+      <li>Mac で <b>音声生成/make_audio.command</b> をダブルクリックし、リストを選ぶ → ZIP ができる</li>
+      <li>ZIP を iPhone に送り、「③ 音声ZIPを取り込む」で選ぶ</li>
+    </ol>
+    <label>Mac で使う声（既定 Daniel ＝ 英国英語）</label>
+    <input type="text" id="macVoice" placeholder="Daniel" autocapitalize="off" autocomplete="off" spellcheck="false">
+    <div class="row" style="margin-top:8px">
+      <button class="btn sm" id="btnExportList">① リストを書き出す</button>
+      <button class="btn sm" id="btnCopyList">リストをコピー</button>
+    </div>
+    <div class="row" style="margin-top:7px">
+      <button class="btn ok" id="btnPickAudio">③ 音声ZIPを取り込む</button>
+      <input type="file" id="audioIn" accept=".zip,application/zip,audio/*,.wav" multiple style="display:none">
+    </div>
+    <p class="note" id="audioStat" style="white-space:pre-line"></p>
+    <div class="row">
+      <button class="btn sm" id="btnDelScriptAudio">この原稿の音声を削除</button>
+      <button class="btn sm" id="btnDelUnused">使われていない音声を削除</button>
+    </div>
+    <p class="note">原稿を直したり、分割や読み替えルールを変えたりすると、変わったフレーズだけ「未生成」になります。もう一度 ①〜③ を行うと、Mac 側は増えた分だけ作ります。</p>
   </div>
   <div class="card">
     <h2>保存済みの原稿</h2>
@@ -311,6 +349,12 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
       <button class="btn sm" id="btnRdSpeak">その文を読み上げる</button>
     </div>
     <p class="note" id="rdPreview" style="white-space:pre-line">画面の表示は変えずに、読み上げに渡す文字だけを置き換えます。自分のルールが最初に適用されるので、組み込みの変換を上書きできます。</p>
+  </div>
+  <div class="card">
+    <h2>画面ロックと再生</h2>
+    <label><input type="checkbox" id="keepAwake"> 再生中は画面を自動で消さない（iOS 16.4 以降）</label>
+    <label><input type="checkbox" id="lockText"> ロック画面にフレーズの英文を表示する</label>
+    <p class="note">「読み上げ」方式は、画面をロックしたり他のアプリに切り替えたりすると止まります（iOS の仕様で回避できません）。ロック中も聞きたいときは、練習タブで「音声ファイル」方式に切り替えてください。<br>ロック画面の表示は既定で「フレーズ 12 / 166」のような番号だけです。電車内など人目のある場所では英文を表示しないことをお勧めします。<br>ロック中に一時停止したまま30秒以上たつと、ロック画面から再開できなくなることがあります（iOS の不具合）。その場合はアプリを開いて再生してください。</p>
   </div>
   <div class="card">
     <h2>表示</h2>
@@ -383,7 +427,7 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
    機密情報はこのファイルに一切含めません。原稿は端末の localStorage のみ。
    ========================================================================= */
 "use strict";
-var APP_VERSION = "v1.1.0 (2026-10-04)";
+var APP_VERSION = "v1.2.0 (2026-10-04)";
 
 /* ---------- エラー表示 ---------- */
 function showErr(msg){
@@ -643,6 +687,7 @@ var ST = {
     silFactor:1, autoRec:false, voiceURI:'', theme:'auto', fs:'2',
     maskMode:'full', showJa:false, wordHl:true, targetMin:20,
     rdNuclide:true, rdUnit:true, rdRules:'',
+    playMode:'tts', fileRange:'all', keepAwake:true, lockText:false, macVoice:'Daniel',
     maxWords:12, splitNum:true, splitPrio:true
   }
 };
@@ -968,14 +1013,14 @@ function bump(i){
   var p=prog(); p.counts[i]=(p.counts[i]||0)+1; save();
 }
 function playOne(){
-  prime(); SP.stopFlag=false; SP.mode='one';
+  prime(); wakeOn(); SP.stopFlag=false; SP.mode='one';
   var ph=phrases()[ST.idx]; if(!ph) return;
   if(ph.head && !ST.cfg.speakHeads){ nextPhrase(); return; }
   renderPractice();
   speakOne(speakText(ph), function(){ bump(ST.idx); SP.mode=null; renderPractice(); });
 }
 function playSeq(){
-  prime(); SP.stopFlag=false; SP.mode='seq';
+  prime(); wakeOn(); SP.stopFlag=false; SP.mode='seq';
   step();
   function step(){
     if(SP.stopFlag||SP.mode!=='seq') return;
@@ -996,7 +1041,7 @@ function playSeq(){
   }
 }
 function playRepeat(){
-  prime(); SP.stopFlag=false; SP.mode='repeat'; SP.repLeft=+ST.cfg.repeatN||1;
+  prime(); wakeOn(); SP.stopFlag=false; SP.mode='repeat'; SP.repLeft=+ST.cfg.repeatN||1;
   var ph=phrases()[ST.idx]; if(!ph) return;
   renderPractice();
   (function step(){
@@ -1012,7 +1057,7 @@ function playRepeat(){
 }
 function playAB(){
   if(SP.abA==null||SP.abB==null) return;
-  prime(); SP.stopFlag=false; SP.mode='ab';
+  prime(); wakeOn(); SP.stopFlag=false; SP.mode='ab';
   ST.idx=SP.abA;
   (function step(){
     if(SP.stopFlag||SP.mode!=='ab') return;
@@ -1029,7 +1074,7 @@ function playAB(){
   })();
 }
 function playShadow(){
-  prime(); SP.stopFlag=false; SP.mode='shadow';
+  prime(); wakeOn(); SP.stopFlag=false; SP.mode='shadow';
   (function step(){
     if(SP.stopFlag||SP.mode!=='shadow') return;
     var list=phrases(), ph=list[ST.idx];
@@ -1113,6 +1158,534 @@ function compare(){
 }
 
 /* =========================================================================
+   3-B. 画面ロック対策
+     (1) Wake Lock …… 再生中は画面を自動で消さない
+     (2) 音声ファイル方式 …… Mac で作った WAV を取り込み、フレーズ間の無音まで
+         含めた「1本の連続した音声」に組み立てて <audio> で再生する。
+         - <audio> 要素はロック中も再生が続く（iOS 15.4 以降。WebKit bug 198277）
+         - Web Audio（AudioContext）はロックで止まるので再生には使わない
+         - ロック中に一時停止が30秒続くと再開できなくなる不具合があるため、
+           ポーズやシャドーイングの無音は「無音の音声」として焼き込む
+   ========================================================================= */
+
+/* ---- (1) Wake Lock ---- */
+var WL={lock:null, want:false, err:'', tries:0};
+function wakeOn(){
+  WL.want=true;
+  if(!ST.cfg.keepAwake || !('wakeLock' in navigator) || WL.lock || document.hidden) return;
+  WL.tries++;
+  try{
+    navigator.wakeLock.request('screen').then(function(l){
+      WL.lock=l; WL.err='';
+      l.addEventListener('release', function(){ if(WL.lock===l) WL.lock=null; });
+      if(!WL.want){ try{ l.release(); }catch(e){} }
+    }).catch(function(e){ WL.err=(e&&e.name)||'error'; });
+  }catch(e){ WL.err=(e&&e.name)||'error'; }
+}
+function wakeOff(){
+  WL.want=false;
+  if(WL.lock){ var l=WL.lock; WL.lock=null; try{ l.release(); }catch(e){} }
+}
+
+/* ---- IndexedDB（音声の保存先。端末内のみ） ---- */
+var IDB={db:null, keys:null};
+function idb(){
+  return new Promise(function(res,rej){
+    if(IDB.db) return res(IDB.db);
+    if(!window.indexedDB) return rej(new Error('この端末は IndexedDB に対応していません'));
+    var rq=indexedDB.open('pps-audio',1);
+    rq.onupgradeneeded=function(){ var d=rq.result; if(!d.objectStoreNames.contains('a')) d.createObjectStore('a'); };
+    rq.onsuccess=function(){ IDB.db=rq.result; IDB.db.onversionchange=function(){ try{IDB.db.close();}catch(e){} IDB.db=null; }; res(IDB.db); };
+    rq.onerror=function(){ rej(rq.error||new Error('IndexedDB を開けません')); };
+  });
+}
+function idbTx(mode, fn){
+  return idb().then(function(d){
+    return new Promise(function(res,rej){
+      var tx=d.transaction('a',mode), st=tx.objectStore('a'), out={};
+      fn(st,out);
+      tx.oncomplete=function(){ res(out.r && 'result' in out.r ? out.r.result : out.v); };
+      tx.onerror=function(){ rej(tx.error||new Error('保存に失敗しました')); };
+      tx.onabort=function(){ rej(tx.error||new Error('保存が中断されました（空き容量不足の可能性）')); };
+    });
+  });
+}
+function idbGet(k){ return idbTx('readonly', function(s,o){ o.r=s.get(k); }); }
+function idbKeys(){ return idbTx('readonly', function(s,o){ o.r=s.getAllKeys(); }); }
+function idbPutMany(items){ return idbTx('readwrite', function(s,o){ items.forEach(function(it){ s.put(it.v, it.k); }); o.v=items.length; }); }
+function idbDelMany(keys){ return idbTx('readwrite', function(s,o){ keys.forEach(function(k){ s.delete(k); }); o.v=keys.length; }); }
+function refreshKeys(){ return idbKeys().then(function(k){ IDB.keys=new Set(k||[]); AUD.cov=null; return IDB.keys; }); }
+
+/* ---- フレーズ ⇔ 音声ファイルの対応（読み上げ文のハッシュ） ---- */
+function cyrb53(str){
+  var h1=0xdeadbeef, h2=0x41c6ce57;
+  for(var i=0;i<str.length;i++){ var ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return 4294967296*(2097151&h2)+(h1>>>0);
+}
+/* 読み替え後の文で決まる ID（14桁16進）。原稿や読み替えルールを変えると、変わったフレーズだけ ID が変わる */
+function phraseKey(ph){ return ('00000000000000'+cyrb53('pps1|'+toSpeech(ph.t)).toString(16)).slice(-14); }
+
+/* ---- WAV の読み書き ---- */
+function wavBlob(pcm, sr){
+  var n=pcm.length, buf=new ArrayBuffer(44+n*2), dv=new DataView(buf);
+  function w(o,s){ for(var i=0;i<s.length;i++) dv.setUint8(o+i,s.charCodeAt(i)); }
+  w(0,'RIFF'); dv.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt ');
+  dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
+  dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+  w(36,'data'); dv.setUint32(40,n*2,true);
+  new Int16Array(buf,44,n).set(pcm);
+  return new Blob([buf],{type:'audio/wav'});
+}
+/* 16bit PCM の WAV を読む（say が出す形式）。それ以外は null を返し、汎用デコードに回す */
+function parseWav(ab){
+  if(!ab || ab.byteLength<44) return null;
+  var dv=new DataView(ab);
+  if(dv.getUint32(0,false)!==0x52494646 || dv.getUint32(8,false)!==0x57415645) return null;
+  var p=12, fmt=null, data=null;
+  while(p+8<=ab.byteLength){
+    var id=dv.getUint32(p,false), sz=dv.getUint32(p+4,true);
+    if(id===0x666d7420 && p+24<=ab.byteLength){
+      var tag=dv.getUint16(p+8,true);
+      if(tag===0xFFFE && sz>=40 && p+8+26<=ab.byteLength) tag=dv.getUint16(p+8+24,true);
+      fmt={tag:tag, ch:dv.getUint16(p+10,true), sr:dv.getUint32(p+12,true), bits:dv.getUint16(p+22,true)};
+    } else if(id===0x64617461){
+      data={off:p+8, len:Math.min(sz, ab.byteLength-(p+8))}; break;
+    }
+    p+=8+sz+(sz&1);
+  }
+  if(!fmt||!data||fmt.tag!==1||fmt.bits!==16||fmt.ch<1) return null;
+  var frames=Math.floor(data.len/(2*fmt.ch)), out=new Int16Array(frames);
+  if(fmt.ch===1){
+    out.set(new Int16Array(ab.slice(data.off, data.off+frames*2)));
+  } else {
+    for(var i=0;i<frames;i++){ var s=0; for(var c=0;c<fmt.ch;c++) s+=dv.getInt16(data.off+2*(i*fmt.ch+c),true); out[i]=s/fmt.ch; }
+  }
+  return {sr:fmt.sr, pcm:out};
+}
+/* 前後の無音を詰める（フレーズ間のポーズを設定どおりにするため） */
+function trimPCM(pcm, sr){
+  var thr=250, n=pcm.length, a=0, b=n-1;
+  while(a<n && Math.abs(pcm[a])<thr) a++;
+  while(b>a && Math.abs(pcm[b])<thr) b--;
+  if(a>=b) return pcm;
+  var pad=Math.round(0.04*sr);
+  return pcm.subarray(Math.max(0,a-pad), Math.min(n,b+pad+1));
+}
+function resamplePCM(pcm, from, to){
+  if(from===to) return pcm;
+  var n=Math.max(1,Math.round(pcm.length*to/from)), out=new Int16Array(n), r=from/to;
+  for(var i=0;i<n;i++){ var x=i*r, j=Math.floor(x), f=x-j, a=pcm[j]||0, b=pcm[j+1]===undefined?a:pcm[j+1]; out[i]=a+(b-a)*f; }
+  return out;
+}
+/* WAV 以外（m4a 等）は端末のデコーダに任せる（WAV 以外は未検証） */
+function decodeOther(buf, sr){
+  var OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  if(!OAC) return Promise.reject(new Error('この端末ではこの形式の音声を読めません。WAV を使ってください。'));
+  var ctx; try{ ctx=new OAC(1,1,sr); }catch(e){ ctx=new OAC(1,1,44100); }
+  return new Promise(function(res,rej){
+    function done(ab){
+      var n=ab.length, d0=ab.getChannelData(0), d1=ab.numberOfChannels>1?ab.getChannelData(1):null, out=new Int16Array(n);
+      for(var i=0;i<n;i++){ var v=d1?(d0[i]+d1[i])/2:d0[i]; v=v<-1?-1:(v>1?1:v); out[i]=v<0?v*32768:v*32767; }
+      res({sr:ab.sampleRate, pcm:out});
+    }
+    try{
+      var r=ctx.decodeAudioData(buf, done, function(e){ rej(e||new Error('音声を読み込めませんでした')); });
+      if(r && r.then) r.then(function(){}, function(){});
+    }catch(e){ rej(e); }
+  });
+}
+
+/* ---- ZIP（Mac の zip / Finder の「圧縮」の両方を読む） ---- */
+function isZipBuf(ab){ if(!ab||ab.byteLength<4) return false; var u=new Uint8Array(ab,0,4); return u[0]===0x50&&u[1]===0x4b&&u[2]===0x03&&u[3]===0x04; }
+function readZip(ab){
+  var dv=new DataView(ab), u8=new Uint8Array(ab), eocd=-1;
+  for(var i=ab.byteLength-22; i>=Math.max(0,ab.byteLength-22-65535); i--){ if(dv.getUint32(i,true)===0x06054b50){ eocd=i; break; } }
+  if(eocd<0) throw new Error('ZIP として読めません');
+  var n=dv.getUint16(eocd+10,true), p=dv.getUint32(eocd+16,true), out=[];
+  if(p===0xFFFFFFFF) throw new Error('この ZIP 形式（ZIP64）には対応していません');
+  var td=window.TextDecoder? new TextDecoder('utf-8') : null;
+  for(var k=0;k<n;k++){
+    if(dv.getUint32(p,true)!==0x02014b50) throw new Error('ZIP の目次が壊れています');
+    var method=dv.getUint16(p+10,true), csize=dv.getUint32(p+20,true);
+    var nlen=dv.getUint16(p+28,true), xlen=dv.getUint16(p+30,true), clen=dv.getUint16(p+32,true), lho=dv.getUint32(p+42,true);
+    var nb=u8.subarray(p+46,p+46+nlen), name='';
+    if(td) name=td.decode(nb); else for(var q=0;q<nb.length;q++) name+=String.fromCharCode(nb[q]);
+    p+=46+nlen+xlen+clen;
+    if(dv.getUint32(lho,true)!==0x04034b50) continue;
+    var ds=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true);
+    out.push({name:name, method:method, comp:u8.subarray(ds, ds+csize)});
+  }
+  return out;
+}
+function inflateEntry(e){
+  if(e.method===0) return Promise.resolve(e.comp.slice().buffer);
+  if(e.method===8){
+    if(!window.DecompressionStream) return Promise.reject(new Error('圧縮された ZIP を読めません（iOS 16.4 以降が必要）。Mac のスクリプトで作った ZIP を使ってください。'));
+    var s=new Blob([e.comp]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Response(s).arrayBuffer();
+  }
+  return Promise.reject(new Error('未対応の圧縮方式です（'+e.method+'）'));
+}
+function readAB(f){
+  if(f.arrayBuffer) return f.arrayBuffer();
+  return new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); }; r.readAsArrayBuffer(f); });
+}
+
+/* ---- (2) 音声ファイル方式の再生エンジン ---- */
+var AUD={el:null, url:null, map:[], kind:null, cache:{}, sr:0, lastT:0, building:false, cov:null, after:null, silentUrl:null};
+var KIND_L={seq:'通し再生', one:'1フレーズ', repeat:'リピート', shadow:'シャドーイング', ab:'A-B区間'};
+var RANGE_L={all:'原稿全体', sec:'いまのセクション', star:'★ 苦手だけ'};
+function isFile(){ return ST.cfg.playMode==='file'; }
+
+function audEl(){
+  if(AUD.el) return AUD.el;
+  var a=document.createElement('audio');
+  a.setAttribute('playsinline',''); a.preload='auto'; a.style.display='none';
+  document.body.appendChild(a); AUD.el=a;
+  a.addEventListener('timeupdate', function(){ syncFromAudio(false); });
+  a.addEventListener('seeked', function(){ if(!AUD.url) return; AUD.lastT=a.currentTime; syncFromAudio(true); posState(); });
+  a.addEventListener('play', function(){ if(!AUD.url) return; wakeOn(); mediaState('playing'); renderPractice(); });
+  a.addEventListener('pause', function(){ if(!AUD.url) return; mediaState('paused'); renderPractice(); });
+  a.addEventListener('ended', function(){
+    if(!AUD.url) return;
+    syncFromAudio(false); mediaState('none');
+    var f=AUD.after; AUD.after=null;
+    if(f) f(); else setSpeakState('最後まで再生しました。');
+    renderPractice();
+  });
+  a.addEventListener('loadedmetadata', posState);
+  a.addEventListener('ratechange', posState);
+  return a;
+}
+/* タップ操作の中で一度だけ再生させ、以後のプログラムからの再生を許可させる（iOS） */
+function audUnlock(){
+  var a=audEl();
+  if(AUD.url || !AUD.silentUrl) return;
+  try{ a.src=AUD.silentUrl; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+}
+function applyRate(){
+  var a=AUD.el; if(!a) return;
+  var r=+ST.cfg.rate||1;
+  try{ a.preservesPitch=true; a.webkitPreservesPitch=true; }catch(e){}
+  try{ a.defaultPlaybackRate=r; a.playbackRate=r; }catch(e){}
+}
+function stopAudio(){
+  var a=AUD.el, had=!!AUD.url;
+  AUD.after=null;
+  if(a){ try{ a.pause(); }catch(e){} a.loop=false; }
+  if(AUD.url){ try{ URL.revokeObjectURL(AUD.url); }catch(e){} }
+  AUD.url=null; AUD.map=[]; AUD.kind=null;
+  if(a && had){ a.removeAttribute('src'); try{ a.load(); }catch(e){} }
+  mediaState('none');
+}
+
+function bodyIdx(filter){ var l=phrases(), out=[]; for(var i=0;i<l.length;i++){ if(l[i].head) continue; if(!filter||filter(l[i],i)) out.push(i); } return out; }
+function rangeIndices(kind){
+  var l=phrases(), cur=l[ST.idx];
+  if(kind==='ab') return bodyIdx(function(p,i){ return i>=SP.abA && i<=SP.abB; });
+  if(kind==='one'){ if(cur&&!cur.head) return [ST.idx]; return bodyIdx(function(p,i){ return i>ST.idx; }).slice(0,1); }
+  var r=ST.cfg.fileRange;
+  if(r==='sec' && cur) return bodyIdx(function(p){ return p.sec===cur.sec; });
+  if(r==='star'){ var st=prog().stars; return bodyIdx(function(p,i){ return !!st[i]; }); }
+  return bodyIdx();
+}
+function coverage(idxs){
+  var l=phrases(), have=0, total=0;
+  (idxs||bodyIdx()).forEach(function(i){ total++; if(IDB.keys && IDB.keys.has(phraseKey(l[i]))) have++; });
+  return {have:have, total:total};
+}
+function cov(){
+  var s=activeScript(), sid=s?s.id:null;
+  if(!AUD.cov || AUD.cov.sid!==sid){ var c=coverage(); c.sid=sid; AUD.cov=c; }
+  return AUD.cov;
+}
+
+/* 1フレーズ分の PCM（キャッシュ付き） */
+function getPCM(key){
+  if(AUD.cache[key]) return Promise.resolve(AUD.cache[key]);
+  return idbGet(key).then(function(rec){
+    if(!rec || !rec.buf) return null;
+    var w=parseWav(rec.buf);
+    var p = w ? Promise.resolve(w) : decodeOther(rec.buf.slice(0), AUD.sr||22050);
+    return p.then(function(x){
+      if(!AUD.sr) AUD.sr=x.sr;
+      var pcm=trimPCM(resamplePCM(x.pcm, x.sr, AUD.sr), AUD.sr);
+      AUD.cache[key]=pcm; return pcm;
+    });
+  });
+}
+
+/**
+ * 再生用トラックを組み立てる。
+ *  seq/one/ab : 音声 → ポーズ
+ *  repeat     : （音声 → ポーズ）× リピート回数 を各フレーズで
+ *  shadow     : 音声 → 無音（音声の長さ×係数、最低0.7秒）→ ポーズ
+ * 返り値の map[k] = {i:フレーズ番号, s:話し始め(秒), e:話し終わり(秒), n:次の区切り(秒), r:何回目}
+ */
+function buildTrack(idxs, kind, onProg){
+  var l=phrases(), items=[], missing=0, j=0;
+  function step(){
+    if(j>=idxs.length) return Promise.resolve();
+    var i=idxs[j++], ph=l[i];
+    if(!ph||ph.head) return step();
+    return getPCM(phraseKey(ph)).then(function(pcm){
+      if(pcm) items.push({i:i, pcm:pcm}); else missing++;
+      if(onProg) onProg(j, idxs.length);
+      return step();
+    });
+  }
+  return step().then(function(){
+    if(!items.length) throw new Error('この範囲の音声ファイルがありません');
+    var sr=AUD.sr||22050, gap=Math.round((+ST.cfg.gap||0)*sr);
+    var reps=kind==='repeat' ? Math.max(1,+ST.cfg.repeatN||1) : 1;
+    var fac=+ST.cfg.silFactor||1, minSil=Math.round(0.7*sr), lead=Math.round(0.15*sr);
+    function sil(len){ return kind==='shadow' ? Math.max(minSil, Math.round(len*fac)) : 0; }
+    var total=lead;
+    items.forEach(function(x){ total+=reps*(x.pcm.length+sil(x.pcm.length)+gap); });
+    var out=new Int16Array(total), pos=lead, map=[];
+    items.forEach(function(x){
+      for(var r=0;r<reps;r++){
+        var st=pos; out.set(x.pcm,pos); pos+=x.pcm.length; var en=pos;
+        pos+=sil(x.pcm.length)+gap;
+        map.push({i:x.i, s:st/sr, e:en/sr, n:pos/sr, r:r});
+      }
+    });
+    return {blob:wavBlob(out,sr), map:map, missing:missing, dur:total/sr, sr:sr, bytes:44+total*2};
+  });
+}
+function curSeg(t){
+  var m=AUD.map, lo=0, hi=m.length-1, k=0;
+  while(lo<=hi){ var mid=(lo+hi)>>1; if(m[mid].s-0.06<=t){ k=mid; lo=mid+1; } else hi=mid-1; }
+  return k;
+}
+/* 再生位置 → 画面のフレーズ・練習回数・ロック画面の表示 */
+function syncFromAudio(force){
+  if(!AUD.url || !AUD.map.length) return;
+  var a=AUD.el, t=a.currentTime;
+  if(t>AUD.lastT){
+    for(var k=0;k<AUD.map.length;k++){ var m=AUD.map[k]; if(m.e>AUD.lastT && m.e<=t) bump(m.i); }
+    AUD.lastT=t;
+  }
+  var seg=AUD.map[curSeg(t)];
+  if(seg && (seg.i!==ST.idx || force)){
+    ST.idx=seg.i;
+    if(!document.hidden) renderPractice();
+    mediaMeta();
+  }
+}
+/* フレーズ単位の移動（ロック画面の前へ／次へ と画面の ◀ ▶） */
+function seekPhrase(dir){
+  var a=AUD.el; if(!a||!AUD.url||!AUD.map.length) return false;
+  var m=AUD.map, k=curSeg(a.currentTime), cur=m[k], j;
+  var first=k; while(first>0 && m[first-1].i===cur.i) first--;
+  if(dir>0){
+    j=k+1; while(j<m.length && m[j].i===cur.i) j++;
+    if(j>=m.length){ a.currentTime=Math.max(0,m[m.length-1].n-0.05); return true; }
+  } else {
+    if(a.currentTime-m[first].s>1.5) j=first;
+    else { j=Math.max(0,first-1); while(j>0 && m[j-1].i===m[j].i) j--; }
+  }
+  a.currentTime=Math.max(0,m[j].s-0.05);
+  AUD.lastT=a.currentTime;
+  ST.idx=m[j].i; renderPractice(); mediaMeta();
+  return true;
+}
+function waitMeta(a){
+  return new Promise(function(res){
+    if(a.readyState>=1) return res();
+    var done=false; function ok(){ if(done) return; done=true; a.removeEventListener('loadedmetadata',ok); res(); }
+    a.addEventListener('loadedmetadata',ok); setTimeout(ok,5000);
+  });
+}
+/* トラックを組み立てて再生（ST.idx の位置から） */
+function filePlay(kind, after){
+  var s=activeScript(); if(!s) return Promise.resolve();
+  var idxs=rangeIndices(kind);
+  if(!idxs.length){ setSpeakState(kind==='ab'?'A-B 区間にフレーズがありません。':'再生する範囲にフレーズがありません（★ が1つもない等）。'); return Promise.resolve(); }
+  var c=coverage(idxs);
+  if(!c.have){ setSpeakState('この範囲の音声ファイルがありません。「原稿」タブで音声ZIPを取り込んでください。'); return Promise.resolve(); }
+  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
+  AUD.building=true; renderPractice();
+  setSpeakState('音声を準備中…');
+  return buildTrack(idxs, kind, function(d,n){ if(n>20 && (d%10===0||d===n)) setSpeakState('音声を準備中… '+d+' / '+n); })
+  .then(function(tr){
+    var a=audEl();
+    if(AUD.url){ try{ URL.revokeObjectURL(AUD.url); }catch(e){} }
+    AUD.url=URL.createObjectURL(tr.blob); AUD.map=tr.map; AUD.kind=kind; AUD.after=after||null;
+    a.loop=(kind==='ab');
+    a.src=AUD.url; try{ a.load(); }catch(e){}
+    return waitMeta(a).then(function(){
+      var k=-1;
+      for(var q=0;q<AUD.map.length;q++){ if(AUD.map[q].i>=ST.idx){ k=q; break; } }
+      if(k<0) k=0;
+      try{ a.currentTime=Math.max(0,AUD.map[k].s-0.05); }catch(e){}
+      AUD.lastT=a.currentTime;
+      ST.idx=AUD.map[k].i;
+      applyRate();
+      return a.play();
+    }).then(function(){
+      wakeOn(); mediaMeta(); posState();
+      setSpeakState(KIND_L[kind]+(kind==='repeat'?'（各フレーズ '+ST.cfg.repeatN+' 回）':'')
+        +' ・ '+(kind==='ab'?'A〜B':kind==='one'?'このフレーズ':RANGE_L[ST.cfg.fileRange])
+        +' ・ 全体 '+mmss(tr.dur*1000/(+ST.cfg.rate||1))
+        +(tr.missing?'（未生成 '+tr.missing+' 件はスキップ）':''));
+    });
+  })
+  .catch(function(e){
+    if(e && e.name==='NotAllowedError') setSpeakState('再生が許可されませんでした。もう一度 ▶ を押してください。');
+    else setSpeakState('音声の再生に失敗しました: '+((e&&e.message)||e));
+  })
+  .then(function(){ AUD.building=false; renderPractice(); });
+}
+/* 同じ種類のトラックが読み込み済みなら一時停止／再開、違えば作り直す */
+function fileButton(kind){
+  audUnlock();
+  if(SP.mode) stopSpeak();
+  if(AUD.building) return;
+  if(AUD.url && AUD.kind===kind){
+    var a=AUD.el;
+    if(a.paused){ var p=a.play(); if(p&&p.catch) p.catch(function(){ setSpeakState('もう一度 ▶ を押してください。'); }); }
+    else a.pause();
+    return;
+  }
+  filePlay(kind);
+}
+/* 録音と手本の聞き比べ（音声ファイル方式） */
+function fileCompare(){
+  if(!REC.url){ setSpeakState('録音がありません。「● 録音」で録音してください。'); return; }
+  audUnlock(); if(SP.mode) stopSpeak();
+  filePlay('one', function(){
+    var a=AUD.el, rec=REC.url;
+    setTimeout(function(){
+      if(AUD.url){ try{ URL.revokeObjectURL(AUD.url); }catch(e){} }
+      AUD.url=null; AUD.map=[]; AUD.kind=null;
+      a.loop=false; a.src=rec; var p=a.play(); if(p&&p.catch) p.catch(function(){});
+      setSpeakState('手本 → 自分の声');
+    }, 350);
+  });
+}
+/* 目次などからのジャンプ。再生中のトラックがあればその位置へ移動する */
+function jumpTo(i){
+  ST.idx=i; save();
+  if(AUD.url){
+    /* 見出しや範囲外のフレーズなら、その後ろで最初にトラックに入っているフレーズへ */
+    var k=-1; for(var q=0;q<AUD.map.length;q++){ if(AUD.map[q].i>=i){ k=q; break; } }
+    if(k>=0){ AUD.el.currentTime=Math.max(0,AUD.map[k].s-0.05); AUD.lastT=AUD.el.currentTime; ST.idx=AUD.map[k].i; mediaMeta(); }
+    else stopAudio();
+  } else if(SP.mode){ stopSpeak(); }
+  renderPractice(); go('practice');
+}
+
+/* ---- ロック画面（Media Session） ---- */
+function mediaSetup(){
+  if(!('mediaSession' in navigator)) return;
+  var ms=navigator.mediaSession;
+  function h(n,f){ try{ ms.setActionHandler(n,f); }catch(e){} }
+  h('play', function(){ if(AUD.url){ var p=AUD.el.play(); if(p&&p.catch) p.catch(function(){}); } });
+  h('pause', function(){ if(AUD.el) AUD.el.pause(); });
+  h('stop', function(){ stopAudio(); renderPractice(); });
+  h('previoustrack', function(){ seekPhrase(-1); });
+  h('nexttrack', function(){ seekPhrase(1); });
+  h('seekto', function(d){ if(AUD.url && d && typeof d.seekTime==='number'){ AUD.el.currentTime=d.seekTime; AUD.lastT=d.seekTime; } });
+  h('seekbackward', null); h('seekforward', null);
+}
+function mediaMeta(){
+  if(!('mediaSession' in navigator) || !window.MediaMetadata || !AUD.url) return;
+  var s=activeScript(), l=phrases(), ph=l[ST.idx]; if(!s||!ph) return;
+  var title = ST.cfg.lockText ? ph.t : ('フレーズ '+(ST.idx+1)+' / '+l.length);
+  var artist = ST.cfg.lockText ? (s.secTitles[ph.sec]||'') : ('セクション '+(ph.sec+1)+' / '+s.secTitles.length);
+  try{
+    navigator.mediaSession.metadata=new MediaMetadata({title:title, artist:artist, album:'発声練習 ・ '+(KIND_L[AUD.kind]||''),
+      artwork:[{src:'./icon-512.png',sizes:'512x512',type:'image/png'},{src:'./icon-192.png',sizes:'192x192',type:'image/png'}]});
+  }catch(e){}
+}
+function mediaState(st){ try{ if('mediaSession' in navigator) navigator.mediaSession.playbackState=st; }catch(e){} }
+function posState(){
+  try{
+    var a=AUD.el;
+    if(!a||!AUD.url||!('mediaSession' in navigator)||!navigator.mediaSession.setPositionState) return;
+    if(!isFinite(a.duration)||a.duration<=0) return;
+    navigator.mediaSession.setPositionState({duration:a.duration, playbackRate:a.playbackRate||1, position:Math.min(Math.max(0,a.currentTime),a.duration)});
+  }catch(e){}
+}
+
+/* ---- 音声生成用リストの書き出し ---- */
+function safeName(s){ return String(s||'原稿').replace(/[\/\\:*?"<>|\u0000-\u001f]/g,'_').slice(0,80); }
+function buildAudioList(){
+  var s=activeScript(); if(!s) return null;
+  var voice=String(ST.cfg.macVoice||'').replace(/[\r\n\t]/g,' ').trim()||'Daniel';
+  var lines=['# pps-audio-list v1','# script: '+String(s.name).replace(/[\r\n]/g,' '),'# voice: '+voice,'# rate: ',
+    '# created: '+new Date().toISOString(),'# app: '+APP_VERSION,
+    '# 形式: 番号<TAB>ID<TAB>読み上げ文。このファイルは原稿の内容を含むので GitHub に上げないこと。'];
+  var seen={}, n=0;
+  s.phrases.forEach(function(ph,i){
+    if(ph.head) return;
+    var k=phraseKey(ph); if(seen[k]) return; seen[k]=1; n++;
+    lines.push(('000'+(i+1)).slice(-4)+'\t'+k+'\t'+toSpeech(ph.t).replace(/[\t\r\n]+/g,' '));
+  });
+  return {text:lines.join('\n')+'\n', name:safeName(s.name)+'_音声リスト.txt', n:n};
+}
+function setAudioStat(msg){ var e=$('audioStat'); if(e) e.textContent=msg; }
+function renderAudioCard(extra){
+  var e=$('audioStat'); if(!e) return;
+  var s=activeScript();
+  if(!s){ e.textContent='原稿がありません。'; return; }
+  var c=cov(), all=IDB.keys?IDB.keys.size:0;
+  var msg=(extra?extra+'\n':'')+'この原稿：'+c.total+' フレーズ中 '+c.have+' 件の音声あり'
+    +(c.total&&c.have<c.total?'（未生成 '+(c.total-c.have)+' 件。再生時はスキップ）':'')
+    +'\n端末に保存済みの音声：全 '+all+' 件';
+  e.textContent=msg;
+}
+
+/* ---- 取り込み ---- */
+var AUDIO_NAME=/([0-9a-f]{14})\.(wav|wave|m4a|mp3|aif|aiff|caf)$/i;
+function importAudioFiles(files){
+  var items=[], skipped=0, bad=[];
+  setAudioStat('取り込み中…');
+  var chain=Promise.resolve();
+  files.forEach(function(f){
+    chain=chain.then(function(){ return readAB(f); }).then(function(ab){
+      if(isZipBuf(ab) || /\.zip$/i.test(f.name)){
+        var ents=readZip(ab), sub=Promise.resolve();
+        ents.forEach(function(e){
+          var nm=e.name.split('/').pop();
+          if(!nm || /(^|\/)__MACOSX\//.test(e.name) || /^\._/.test(nm)) return;
+          var m=nm.match(AUDIO_NAME);
+          if(!m){ if(!/\.txt$/i.test(nm)) skipped++; return; }
+          sub=sub.then(function(){ return inflateEntry(e); }).then(function(buf){
+            items.push({k:m[1].toLowerCase(), v:{buf:buf, name:nm, size:buf.byteLength, t:Date.now()}});
+          });
+        });
+        return sub;
+      }
+      var m2=f.name.match(AUDIO_NAME);
+      if(!m2){ skipped++; bad.push(f.name); return; }
+      items.push({k:m2[1].toLowerCase(), v:{buf:ab, name:f.name, size:ab.byteLength, t:Date.now()}});
+    });
+  });
+  return chain.then(function(){
+    var p=Promise.resolve();
+    for(var i=0;i<items.length;i+=20){ (function(b){ p=p.then(function(){ return idbPutMany(b); }); })(items.slice(i,i+20)); }
+    return p;
+  }).then(function(){
+    items.forEach(function(it){ delete AUD.cache[it.k]; });
+    if(!Object.keys(AUD.cache).length) AUD.sr=0;
+    try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+    return refreshKeys();
+  }).then(function(){
+    var c=cov();
+    var msg='取り込み完了：'+items.length+' 件'+(skipped?'（音声ファイル名でないもの '+skipped+' 件は無視）':'');
+    renderAudioCard(msg); renderPractice();
+    return {imported:items.length, skipped:skipped, have:c.have, total:c.total};
+  }).catch(function(e){
+    renderAudioCard('取り込みに失敗しました: '+((e&&e.message)||e));
+    throw e;
+  });
+}
+
+/* =========================================================================
    5. タイマー
    ========================================================================= */
 var TM={ t0:Date.now(), secStart:Date.now(), curSec:-1 };
@@ -1122,6 +1695,7 @@ function tickClock(){
   var elapsed=(p.total||0)+(Date.now()-TM.t0);
   var tgt=(+ST.cfg.targetMin||0)*60000;
   el2.textContent = mmss(Date.now()-TM.t0) + (tgt? ' / '+mmss(tgt) : '');
+  if(WL.want && !SP.mode && !AUD.building && !(AUD.url && AUD.el && !AUD.el.paused)) wakeOff();
   var ts=$('timeStat');
   if(ts) ts.textContent='今回の経過 '+mmss(Date.now()-TM.t0)+' ／ 累計 '+mmss(elapsed)
     + (tgt? '（目標 '+mmss(tgt)+'、累計で '+Math.round(elapsed/tgt*100)+'%）':'');
@@ -1141,8 +1715,20 @@ window.addEventListener('pagehide', function(){
   var p=prog(); p.total=(p.total||0)+(Date.now()-TM.t0); accumSec(); save();
 });
 document.addEventListener('visibilitychange', function(){
-  if(document.hidden){ var p=prog(); p.total=(p.total||0)+(Date.now()-TM.t0); accumSec(); save(); TM.t0=Date.now(); }
-  else { SP.primed=false; }  /* 復帰後に再度プライムが必要になることがある */
+  if(document.hidden){
+    /* 読み上げ方式はロック・アプリ切替で iOS に止められる。中途半端に固まらないよう自分で止めておく */
+    if(SP.mode){ SP.interrupted=true; stopSpeak(); }
+    var p=prog(); p.total=(p.total||0)+(Date.now()-TM.t0); accumSec(); save(); TM.t0=Date.now();
+  } else {
+    SP.primed=false;  /* 復帰後に再度プライムが必要になることがある */
+    if(SP.interrupted){
+      SP.interrupted=false;
+      try{ if(synth) synth.cancel(); }catch(e){}
+      setSpeakState('画面ロックなどで読み上げを中断しました。▶ で続きから再開できます。ロック中も聞くには「音声ファイル」方式を使ってください。');
+    }
+    if(WL.want) wakeOn();
+    if(AUD.url) syncFromAudio(true);
+  }
 });
 
 /* =========================================================================
@@ -1208,7 +1794,7 @@ function renderPractice(){
   if(REC.on) m.appendChild(el('span','chip pri','● 録音中'));
 
   $('bar').firstChild.style.width = (list.length? (ST.idx+1)/list.length*100 : 0)+'%';
-  $('btnPlay').textContent = (SP.mode==='seq')? '⏸ 停止' : '▶ 読み上げ';
+  $('btnPlay').textContent = (SP.mode==='seq')? '■ 停止' : '▶ 読み上げ';
   $('btnStar').classList.toggle('on', !!p.stars[ST.idx]);
   $('btnShadow').classList.toggle('on', SP.mode==='shadow');
   $('btnRec').classList.toggle('on', REC.on);
@@ -1217,6 +1803,32 @@ function renderPractice(){
   $('btnCompare').disabled = !REC.url;
   $('btnPrev').disabled = ST.idx<=0;
   $('btnNext').disabled = ST.idx>=list.length-1;
+  renderMode();
+}
+/* 再生方式（読み上げ／音声ファイル）に応じた表示 */
+function renderMode(){
+  var f=isFile(), segs=document.querySelectorAll('#modeSeg [data-pm]');
+  for(var i=0;i<segs.length;i++) segs[i].classList.toggle('on', segs[i].dataset.pm===ST.cfg.playMode);
+  var fo=$('fileOpts'), fs=$('fileStatus');
+  if(fo) fo.style.display=f?'block':'none';
+  if(!f){ $('btnPlay').disabled=false; $('btnRepeat').classList.toggle('on', SP.mode==='repeat'); }
+  if(!fs) return;
+  fs.style.display=f?'block':'none';
+  if(!f) return;
+  var c=cov(), a=AUD.el, loaded=!!AUD.url, playing=loaded && a && !a.paused;
+  var t='音声ファイル：この原稿 '+c.total+' フレーズ中 '+c.have+' 件あり';
+  if(!c.have) t+='\n→「原稿」タブの「音声ファイル」で準備してください';
+  else if(c.have<c.total) t+='（未生成 '+(c.total-c.have)+' 件は再生時にスキップ）';
+  if(loaded) t+='\n'+(playing?'再生中':'一時停止中')+'：'+(KIND_L[AUD.kind]||'')+(AUD.kind==='repeat'?'（各フレーズ '+ST.cfg.repeatN+' 回）':'')
+    +' ・ '+(AUD.kind==='ab'?'A〜B':AUD.kind==='one'?'このフレーズ':(RANGE_L[ST.cfg.fileRange]||''));
+  fs.textContent=t;
+  var pk=(AUD.kind==='seq'||AUD.kind==='one');
+  $('btnPlay').textContent = AUD.building ? '準備中…' : (playing&&pk ? '‖ 一時停止' : (loaded&&pk ? '▶ 再開' : '▶ 再生'));
+  $('btnPlay').disabled = AUD.building || !c.have;
+  $('btnShadow').classList.toggle('on', loaded && AUD.kind==='shadow');
+  $('btnRepeat').classList.toggle('on', loaded && AUD.kind==='repeat');
+  $('btnAB').classList.toggle('on', loaded && AUD.kind==='ab');
+  if(loaded){ $('btnPrev').disabled=false; $('btnNext').disabled=false; }
 }
 function nextPhrase(){ var l=phrases(); if(ST.idx<l.length-1){ ST.idx++; save(); renderPractice(); } }
 function prevPhrase(){ if(ST.idx>0){ ST.idx--; save(); renderPractice(); } }
@@ -1282,7 +1894,7 @@ function renderSplitEditor(){
       save(); renderSplitEditor(); renderPractice(); renderToc();
     };
     var bg=el('button','btn sm','ここから練習');
-    bg.onclick=function(){ ST.idx=i; save(); renderPractice(); go('practice'); };
+    bg.onclick=function(){ jumpTo(i); };
     ops.appendChild(bm); ops.appendChild(bs); ops.appendChild(bg);
     d.appendChild(ops);
     box.appendChild(d);
@@ -1302,7 +1914,7 @@ function renderToc(){
     tt.appendChild(el('div',null,t));
     tt.appendChild(el('div','note', cnt+' フレーズ・練習済 '+done+' / 実測 '+mmss(p.secTime[si]||0)));
     d.appendChild(tt);
-    d.onclick=function(){ if(first>=0){ ST.idx=first; save(); renderPractice(); go('practice'); } };
+    d.onclick=function(){ if(first>=0) jumpTo(first); };
     box.appendChild(d);
   });
   var pl=$('phList'); pl.innerHTML='';
@@ -1313,7 +1925,7 @@ function renderToc(){
     d.appendChild(el('div','n',String(i+1)));
     d.appendChild(el('div','t',(ph.head?'【'+ph.t+'】':ph.t)));
     if(p.stars[i]) d.appendChild(el('div','st','★'));
-    d.onclick=function(){ ST.idx=i; save(); renderPractice(); go('practice'); };
+    d.onclick=function(){ jumpTo(i); };
     pl.appendChild(d);
   });
   if(!pl.children.length) pl.appendChild(el('p','note','該当するフレーズはありません。'));
@@ -1346,12 +1958,12 @@ function renderRecord(){
     var d=el('div','item');
     d.appendChild(el('div','n',String(i+1)));
     d.appendChild(el('div','t',ph.t));
-    d.onclick=function(){ ST.idx=i; save(); renderPractice(); go('practice'); };
+    d.onclick=function(){ jumpTo(i); };
     st.appendChild(d);
   });
   if(!any) st.appendChild(el('p','note','★ を付けたフレーズはまだありません。'));
 }
-function renderAll(){ renderPractice(); renderScriptList(); renderToc(); renderRecord(); if($('splitEditor').style.display!=='none') renderSplitEditor(); }
+function renderAll(){ AUD.cov=null; renderPractice(); renderAudioCard(); renderScriptList(); renderToc(); renderRecord(); if($('splitEditor').style.display!=='none') renderSplitEditor(); }
 
 /* =========================================================================
    7. 画面遷移・イベント
@@ -1383,32 +1995,49 @@ function afterCfg(key){
   if(key==='theme') document.documentElement.setAttribute('data-theme',ST.cfg.theme);
   if(key==='fs') document.documentElement.setAttribute('data-fs',ST.cfg.fs);
   if(key==='maskMode'||key==='showJa'||key==='wordHl') renderPractice();
-  if(key==='rdNuclide'||key==='rdUnit'){ renderPractice(); if($('rdPreview')) rdShow(); }
+  if(key==='rdNuclide'||key==='rdUnit'){ AUD.cov=null; renderPractice(); renderAudioCard(); if($('rdPreview')) rdShow(); }
+  if(key==='rate') applyRate();
+  if(key==='keepAwake'){ if(ST.cfg.keepAwake){ if(WL.want) wakeOn(); } else { var w=WL.want; wakeOff(); WL.want=w; } }
+  if(key==='lockText') mediaMeta();
+  if(key==='fileRange') renderPractice();
   if(key==='targetMin') tickClock();
 }
 
 $('btnPlay').addEventListener('click', function(){
+  if(isFile()){ fileButton(ST.cfg.autoNext?'seq':'one'); return; }
   prime();
   if(SP.mode==='seq'){ stopSpeak(); return; }
   if(ST.cfg.autoNext) playSeq(); else playOne();
 });
-$('btnStop').addEventListener('click', stopSpeak);
-$('btnNext').addEventListener('click', function(){ prime(); stopSpeak(); nextPhrase(); });
-$('btnPrev').addEventListener('click', function(){ prime(); stopSpeak(); prevPhrase(); });
-$('btnRepeat').addEventListener('click', function(){ prime(); stopSpeak(); playRepeat(); });
-$('btnShadow').addEventListener('click', function(){ prime(); if(SP.mode==='shadow'){ stopSpeak(); return; } stopSpeak(); SP.stopFlag=false; playShadow(); });
+$('btnStop').addEventListener('click', function(){ stopSpeak(); stopAudio(); setSpeakState(''); renderPractice(); });
+$('btnNext').addEventListener('click', function(){ if(isFile() && AUD.url){ seekPhrase(1); return; } prime(); stopSpeak(); nextPhrase(); });
+$('btnPrev').addEventListener('click', function(){ if(isFile() && AUD.url){ seekPhrase(-1); return; } prime(); stopSpeak(); prevPhrase(); });
+$('btnRepeat').addEventListener('click', function(){ if(isFile()){ fileButton('repeat'); return; } prime(); stopSpeak(); playRepeat(); });
+$('btnShadow').addEventListener('click', function(){ if(isFile()){ fileButton('shadow'); return; } prime(); if(SP.mode==='shadow'){ stopSpeak(); return; } stopSpeak(); SP.stopFlag=false; playShadow(); });
+document.querySelectorAll('#modeSeg [data-pm]').forEach(function(b){
+  b.addEventListener('click', function(){
+    if(ST.cfg.playMode===b.dataset.pm) return;
+    stopSpeak(); stopAudio();
+    ST.cfg.playMode=b.dataset.pm; save(); renderPractice();
+    setSpeakState(b.dataset.pm==='file'
+      ? '音声ファイル方式：画面をロックしても再生が続きます。'
+      : '読み上げ方式：端末の音声合成で読み上げます（画面をロックすると止まります）。');
+  });
+});
 $('btnStar').addEventListener('click', function(){
   var p=prog(); if(p.stars[ST.idx]) delete p.stars[ST.idx]; else p.stars[ST.idx]=1;
   save(); renderPractice(); renderRecord();
 });
 $('btnAB').addEventListener('click', function(){
-  prime();
-  if(SP.mode==='ab'){ stopSpeak(); SP.abA=SP.abB=null; renderPractice(); return; }
+  if(isFile()) audUnlock(); else prime();
+  var abBusy = isFile() ? (AUD.kind==='ab' && !!AUD.url) : SP.mode==='ab';
+  if(abBusy){ stopSpeak(); stopAudio(); SP.abA=SP.abB=null; setSpeakState(''); renderPractice(); return; }
   if(SP.abA==null){ SP.abA=ST.idx; setSpeakState('A を設定しました（'+(SP.abA+1)+'）。B にしたいフレーズでもう一度押してください。'); renderPractice(); return; }
   if(SP.abB==null){
     SP.abB=Math.max(ST.idx,SP.abA);
     if(SP.abB===SP.abA){ setSpeakState('A と B が同じです。別のフレーズで押してください。'); SP.abB=null; return; }
-    playAB(); return;
+    if(isFile()) fileButton('ab'); else playAB();
+    return;
   }
   SP.abA=SP.abB=null; renderPractice();
 });
@@ -1419,7 +2048,7 @@ $('btnMask').addEventListener('click', function(){
 });
 $('btnRec').addEventListener('click', function(){ if(REC.on) stopRec(); else startRec(); });
 $('btnPlayRec').addEventListener('click', function(){ playRec(); });
-$('btnCompare').addEventListener('click', compare);
+$('btnCompare').addEventListener('click', function(){ if(isFile()) fileCompare(); else compare(); });
 document.querySelectorAll('[data-rate]').forEach(function(b){
   b.addEventListener('click', function(){ ST.cfg.rate=+b.dataset.rate; $('rate').value=ST.cfg.rate; afterCfg('rate'); save(); });
 });
@@ -1446,6 +2075,60 @@ $('btnSaveScript').addEventListener('click', function(){
   }
 });
 $('btnPickFile').addEventListener('click', function(){ $('fileIn').click(); });
+$('btnExportList').addEventListener('click', function(){
+  var L=buildAudioList(); if(!L){ alert('原稿がありません。'); return; }
+  var fallback=function(){ dl(L.name, L.text, 'text/plain'); renderAudioCard('リストを書き出しました（'+L.n+' 件）：'+L.name); };
+  try{
+    var f=new File([L.text], L.name, {type:'text/plain'});
+    if(navigator.canShare && navigator.share && navigator.canShare({files:[f]})){
+      navigator.share({files:[f], title:L.name}).then(function(){ renderAudioCard('リストを共有しました（'+L.n+' 件）。Mac で make_audio.command を実行してください。'); })
+        .catch(function(e){ if(!(e && e.name==='AbortError')) fallback(); });
+      return;
+    }
+  }catch(e){}
+  fallback();
+});
+$('btnCopyList').addEventListener('click', function(){
+  var L=buildAudioList(); if(!L){ alert('原稿がありません。'); return; }
+  var ok=function(){ renderAudioCard('リストをコピーしました（'+L.n+' 件）。Mac でテキストエディタに貼り付け、「'+L.name+'」として保存してください。'); };
+  try{ navigator.clipboard.writeText(L.text).then(ok, function(){ alert('コピーできませんでした。「① リストを書き出す」を使ってください。'); }); }
+  catch(e){ alert('コピーできませんでした。「① リストを書き出す」を使ってください。'); }
+});
+$('btnPickAudio').addEventListener('click', function(){ $('audioIn').click(); });
+$('audioIn').addEventListener('change', function(){
+  var files=[].slice.call(this.files||[]); this.value='';
+  if(!files.length) return;
+  stopAudio();
+  importAudioFiles(files).then(function(r){
+    alert('音声を取り込みました。\nこの原稿：'+r.total+' フレーズ中 '+r.have+' 件の音声あり'+(r.have<r.total?'\n（未生成 '+(r.total-r.have)+' 件は再生時にスキップされます）':''));
+  }).catch(function(e){ alert('取り込みに失敗しました。\n'+((e&&e.message)||e)); });
+});
+$('btnDelScriptAudio').addEventListener('click', function(){
+  var s=activeScript(); if(!s) return;
+  var others={};
+  ST.scripts.forEach(function(sc){ if(sc.id===s.id) return; sc.phrases.forEach(function(ph){ if(!ph.head) others[phraseKey(ph)]=1; }); });
+  var keys=[], seen={}, shared=0;
+  s.phrases.forEach(function(ph){
+    if(ph.head) return; var k=phraseKey(ph);
+    if(seen[k] || !(IDB.keys && IDB.keys.has(k))) return; seen[k]=1;
+    if(others[k]) shared++; else keys.push(k);
+  });
+  if(!keys.length){ alert(shared? 'この原稿の音声はすべて他の原稿と共通なので、削除しませんでした（'+shared+' 件）。' : 'この原稿の音声はありません。'); return; }
+  if(!confirm('この原稿の音声 '+keys.length+' 件をこの端末から削除します。'+(shared?'\n（他の原稿と共通の '+shared+' 件は残します）':'')+'\nよろしいですか？')) return;
+  stopAudio();
+  idbDelMany(keys).then(refreshKeys).then(function(){ keys.forEach(function(k){ delete AUD.cache[k]; }); renderAudioCard('削除しました：'+keys.length+' 件'+(shared?'（共通の '+shared+' 件は残しました）':'')); renderPractice(); })
+    .catch(function(e){ alert('削除に失敗しました: '+((e&&e.message)||e)); });
+});
+$('btnDelUnused').addEventListener('click', function(){
+  if(!IDB.keys || !IDB.keys.size){ alert('保存済みの音声はありません。'); return; }
+  var used={};
+  ST.scripts.forEach(function(sc){ sc.phrases.forEach(function(ph){ if(!ph.head) used[phraseKey(ph)]=1; }); });
+  var keys=[]; IDB.keys.forEach(function(k){ if(!used[k]) keys.push(k); });
+  if(!keys.length){ alert('使われていない音声はありません。'); return; }
+  if(!confirm('どの原稿にも対応しない音声 '+keys.length+' 件を削除します。よろしいですか？')) return;
+  idbDelMany(keys).then(refreshKeys).then(function(){ keys.forEach(function(k){ delete AUD.cache[k]; }); renderAudioCard('削除しました：'+keys.length+' 件'); })
+    .catch(function(e){ alert('削除に失敗しました: '+((e&&e.message)||e)); });
+});
 $('fileIn').addEventListener('change', function(){
   var f=this.files&&this.files[0]; if(!f) return;
   var r=new FileReader();
@@ -1496,7 +2179,7 @@ function rdShow(){
   return out;
 }
 $('btnRdSave').addEventListener('click', function(){
-  ST.cfg.rdRules=$('rdRules').value; save();
+  ST.cfg.rdRules=$('rdRules').value; save(); AUD.cov=null; renderAudioCard();
   var n=parseRules(ST.cfg.rdRules).length;
   rdShow(); renderPractice();
   setSpeakState('置換ルールを '+n+' 件 保存しました。');
@@ -1535,9 +2218,15 @@ function dl(name, text, type){
   }catch(e){ showErr('書き出しに失敗: '+e.message); }
 }
 $('btnClear').addEventListener('click', function(){
-  if(!confirm('この端末に保存した原稿・練習記録をすべて消去します。元に戻せません。よろしいですか？')) return;
+  if(!confirm('この端末に保存した原稿・練習記録・音声ファイルをすべて消去します。元に戻せません。よろしいですか？')) return;
   try{ localStorage.removeItem(LSK); }catch(e){}
-  location.reload();
+  stopAudio();
+  var fin=function(){ location.reload(); };
+  try{
+    if(IDB.db){ IDB.db.close(); IDB.db=null; }
+    var rq=indexedDB.deleteDatabase('pps-audio');
+    rq.onsuccess=fin; rq.onerror=fin; rq.onblocked=fin; setTimeout(fin,2000);
+  }catch(e){ fin(); }
 });
 
 /* キーボード（iPad 外付けキーボード） */
@@ -1614,6 +2303,8 @@ function init(){
   bindCfg('autoNext','autoNext','chk'); bindCfg('speakHeads','speakHeads','chk');
   bindCfg('autoRec','autoRec','chk'); bindCfg('showJa','showJa','chk');
   bindCfg('rdNuclide','rdNuclide','chk'); bindCfg('rdUnit','rdUnit','chk');
+  bindCfg('keepAwake','keepAwake','chk'); bindCfg('lockText','lockText','chk');
+  bindCfg('fileRange','fileRange'); bindCfg('macVoice','macVoice');
   $('rdRules').value=ST.cfg.rdRules||'';
   bindCfg('wordHl','wordHl','chk'); bindCfg('splitNum','splitNum','chk'); bindCfg('splitPrio','splitPrio','chk');
   ['rate','pitch','vol','gap','theme','fs','targetMin'].forEach(afterCfg);
@@ -1634,10 +2325,17 @@ function init(){
   env.push('読み上げ: '+(synth?'対応':'非対応'));
   env.push('録音: '+((navigator.mediaDevices&&window.MediaRecorder)?'対応':'非対応'));
   env.push('Service Worker: '+('serviceWorker' in navigator ? '利用可' : '利用不可'));
+  env.push('Wake Lock: '+('wakeLock' in navigator ? '利用可' : '利用不可'));
+  env.push('ロック画面操作: '+('mediaSession' in navigator ? '利用可' : '利用不可'));
+  env.push('音声の保存: '+(window.indexedDB ? '利用可' : '利用不可'));
   if(location.protocol!=='https:'&&location.hostname!=='localhost') env.push('※ https ではないため、録音とオフライン化が使えません。');
   $('envNote').textContent=env.join(' ／ ');
 
+  try{ AUD.silentUrl=URL.createObjectURL(wavBlob(new Int16Array(4410),22050)); }catch(e){}
+  mediaSetup();
   renderAll();
+  refreshKeys().then(function(){ renderPractice(); renderAudioCard(); })
+    .catch(function(e){ IDB.keys=new Set(); renderAudioCard('音声の保存領域（IndexedDB）を開けませんでした: '+((e&&e.message)||e)); });
   tickClock(); setInterval(tickClock, 1000);
   document.addEventListener('touchstart', function once(){ prime(); document.removeEventListener('touchstart', once); }, {passive:true});
   document.addEventListener('click', function once(){ prime(); document.removeEventListener('click', once); });
@@ -1652,7 +2350,10 @@ window.__pps = {
   splitSentences:splitSentences, subSplit:subSplit, parseScript:parseScript, flatten:flatten,
   ST:ST, SP:SP, speakOne:speakOne, SAMPLE:SAMPLE, version:APP_VERSION, save:save, load:load,
   renderAll:renderAll, go:go, buildScript:buildScript,
-  toSpeech:toSpeech, readNuclides:readNuclides, readUnits:readUnits, parseRules:parseRules, isNuclide:isNuclide, isRead:isRead
+  toSpeech:toSpeech, readNuclides:readNuclides, readUnits:readUnits, parseRules:parseRules, isNuclide:isNuclide, isRead:isRead,
+  WL:WL, wakeOn:wakeOn, wakeOff:wakeOff, IDB:IDB, AUD:AUD, phraseKey:phraseKey, cyrb53:cyrb53, buildAudioList:buildAudioList,
+  importAudioFiles:importAudioFiles, buildTrack:buildTrack, filePlay:filePlay, fileButton:fileButton, stopAudio:stopAudio,
+  seekPhrase:seekPhrase, readZip:readZip, parseWav:parseWav, wavBlob:wavBlob, refreshKeys:refreshKeys, cov:cov, jumpTo:jumpTo
 };
 
 init();
