@@ -300,6 +300,19 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
     <input type="range" id="vol" min="0" max="1" step="0.05" value="1">
   </div>
   <div class="card">
+    <h2>読み上げの発音</h2>
+    <label><input type="checkbox" id="rdNuclide"> 核種記号を英語の元素名で読む（Cl-36 →「chlorine 36」）</label>
+    <label><input type="checkbox" id="rdUnit"> 単位・化学式を英語で読む（mSv/h →「millisieverts per hour」）</label>
+    <label>自分で追加する置換ルール（1行に1件、「元の文字 =&gt; 読ませたい文字」）</label>
+    <textarea id="rdRules" style="min-height:96px" placeholder="例：&#10;IAEA =&gt; I A E A&#10;L3 =&gt; L three&#10;/\bNPP\b/ =&gt; nuclear power plant"></textarea>
+    <div class="row" style="margin-top:7px">
+      <button class="btn sm" id="btnRdSave">ルールを保存</button>
+      <button class="btn sm" id="btnRdTest">今のフレーズの読み上げ文を確認</button>
+      <button class="btn sm" id="btnRdSpeak">その文を読み上げる</button>
+    </div>
+    <p class="note" id="rdPreview" style="white-space:pre-line">画面の表示は変えずに、読み上げに渡す文字だけを置き換えます。自分のルールが最初に適用されるので、組み込みの変換を上書きできます。</p>
+  </div>
+  <div class="card">
     <h2>表示</h2>
     <label>テーマ</label>
     <select id="theme"><option value="auto">端末に合わせる</option><option value="light">ライト</option><option value="dark">ダーク</option></select>
@@ -370,7 +383,7 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
    機密情報はこのファイルに一切含めません。原稿は端末の localStorage のみ。
    ========================================================================= */
 "use strict";
-var APP_VERSION = "v1.0.0 (2026-10-03)";
+var APP_VERSION = "v1.1.0 (2026-10-04)";
 
 /* ---------- エラー表示 ---------- */
 function showErr(msg){
@@ -474,6 +487,10 @@ function vetoCut(text, cut){
   if(/\b(?:No|Nos|Unit|Units|Fig|Vol|Tier|Tiers|Stage|Stages|Step|Steps|Table|Figure|Section|Slide|Rev|Art|approx|etc|e\.g|i\.e)\.\s*$/i.test(L)) return true;
   if(/^(?:per|cubic|square|billion|million|thousand|tonnes?|tons?|metres?|meters?|MW|kW|kWh|GBq|MBq|Bq|Sv|mSv|years?|months?|days?|hours?|sections?|employees|yen|containers?|floors?|%)\b/i.test(R)) return true;
   if(/^\d/.test(R) && !/[.,;:!?]\s*$/.test(L)) return true;      /* 数値の直前で切らない（1 to 7 等） */
+  if(/^(?:by|x|\u00d7)\s+\d/i.test(R)) return true;               /* 寸法（15 m | by 8 m）を割らない */
+  if(/\d\s*(?:m|mm|cm|km|kg|t|MW|MWe|kW|kWh|%|mSv|Sv|Bq|GBq|MBq)\s*$/i.test(L)) return true; /* 数値＋単位の直後で切らない */
+  if(/\b(?:Type|Unit|Phase|Stage|Part|Class|Group|Category|Annex|Appendix|Table|Figure)\s+(?:I{1,3}|IV|VI{0,3}|IX|X)\s*$/i.test(L)) return true;
+  if(/^(?:II|III|IV|VI|VII|VIII|IX|X)\b/.test(R)) return true;    /* ローマ数字（Type | II）を割らない */
   return false;
 }
 
@@ -506,7 +523,7 @@ function subSplit(text, maxWords, minWords){
     if(at<lo) at=lo; if(at>hi) at=hi;
     if(at<1||at>=n) at=Math.max(1,Math.floor(n/2));
     /* 列挙を割らないように1語ずらす */
-    for(var d=0; d<3; d++){
+    for(var d=0; d<6; d++){
       var cand=at+ (d%2? -Math.ceil(d/2) : Math.ceil(d/2));
       if(cand<1||cand>=n) continue;
       var pos=words.slice(0,cand).join(' ').length+1;
@@ -586,7 +603,7 @@ function parseScript(raw, opt){
 
     var sents = splitSentences(t);
     for(var si=0; si<sents.length; si++){
-      var parts = subSplit(sents[si], maxWords, 3);
+      var parts = subSplit(sents[si], maxWords);   /* 最小語数は subSplit の既定に任せる */
       for(var pi=0; pi<parts.length; pi++){
         cur.phrases.push({
           t: parts[pi],
@@ -625,6 +642,7 @@ var ST = {
     rate:1, pitch:1, vol:1, gap:0.6, repeatN:3, autoNext:true, speakHeads:false,
     silFactor:1, autoRec:false, voiceURI:'', theme:'auto', fs:'2',
     maskMode:'full', showJa:false, wordHl:true, targetMin:20,
+    rdNuclide:true, rdUnit:true, rdRules:'',
     maxWords:12, splitNum:true, splitPrio:true
   }
 };
@@ -685,7 +703,7 @@ function buildScript(name, raw){
    3. 読み上げ（Web Speech API / iOS 対策つき）
    ========================================================================= */
 var SP = {
-  voices:[], primed:false, boundarySeen:false,
+  voices:[], primed:false, boundarySeen:false, hlOk:true,
   mode:null,            /* null | 'one' | 'seq' | 'repeat' | 'shadow' | 'ab' */
   stopFlag:false, timer:null, watchdog:null,
   curUtt:null, t0:0, lastDur:0,
@@ -758,8 +776,119 @@ function stopSpeak(){
 
 function setSpeakState(s){ var e=$('speakState'); if(e) e.textContent=s; }
 
-/* 読み上げ用テキスト（ラベルは読まない） */
-function speakText(ph){ return ph ? ph.t : ''; }
+/* =========================================================================
+   3-A. 読み上げの発音（表示は変えず、speak() に渡す文字列だけ置き換える）
+   ========================================================================= */
+
+/* 元素記号 → 英語の元素名（原子番号1〜118、en-GB 綴り） */
+var _EL = ("H:hydrogen He:helium Li:lithium Be:beryllium B:boron C:carbon N:nitrogen O:oxygen "+
+"F:fluorine Ne:neon Na:sodium Mg:magnesium Al:aluminium Si:silicon P:phosphorus S:sulfur Cl:chlorine "+
+"Ar:argon K:potassium Ca:calcium Sc:scandium Ti:titanium V:vanadium Cr:chromium Mn:manganese Fe:iron "+
+"Co:cobalt Ni:nickel Cu:copper Zn:zinc Ga:gallium Ge:germanium As:arsenic Se:selenium Br:bromine "+
+"Kr:krypton Rb:rubidium Sr:strontium Y:yttrium Zr:zirconium Nb:niobium Mo:molybdenum Tc:technetium "+
+"Ru:ruthenium Rh:rhodium Pd:palladium Ag:silver Cd:cadmium In:indium Sn:tin Sb:antimony Te:tellurium "+
+"I:iodine Xe:xenon Cs:caesium Ba:barium La:lanthanum Ce:cerium Pr:praseodymium Nd:neodymium "+
+"Pm:promethium Sm:samarium Eu:europium Gd:gadolinium Tb:terbium Dy:dysprosium Ho:holmium Er:erbium "+
+"Tm:thulium Yb:ytterbium Lu:lutetium Hf:hafnium Ta:tantalum W:tungsten Re:rhenium Os:osmium "+
+"Ir:iridium Pt:platinum Au:gold Hg:mercury Tl:thallium Pb:lead Bi:bismuth Po:polonium At:astatine "+
+"Rn:radon Fr:francium Ra:radium Ac:actinium Th:thorium Pa:protactinium U:uranium Np:neptunium "+
+"Pu:plutonium Am:americium Cm:curium Bk:berkelium Cf:californium Es:einsteinium Fm:fermium "+
+"Md:mendelevium No:nobelium Lr:lawrencium Rf:rutherfordium Db:dubnium Sg:seaborgium Bh:bohrium "+
+"Hs:hassium Mt:meitnerium Ds:darmstadtium Rg:roentgenium Cn:copernicium Nh:nihonium Fl:flerovium "+
+"Mc:moscovium Lv:livermorium Ts:tennessine Og:oganesson").split(" ");
+var ELZ={}, ELN={};
+(function(){ for(var i=0;i<_EL.length;i++){ var a=_EL[i].split(":"); ELZ[a[0]]=i+1; ELN[a[0]]=a[1]; } })();
+
+/* 本当に核種らしいか（質量数 A は原子番号 Z 以上で、常識的な範囲に収まる） */
+function isNuclide(sym, A){
+  var z=ELZ[sym];
+  if(!z) return false;
+  return A>=z && A<=3*z+30 && A<=300;
+}
+/**
+ * Cl-36 → chlorine 36、C-14 → carbon 14、Ag-108m → silver 108 m
+ * 36Cl のような前置形にも対応。
+ * Alpha-1 / Unit-1 / L3 / SM400 / No. 2 / FY2029 のような表記は変換しない
+ * （元素記号でない、または A < Z のため除外される）。
+ */
+function readNuclides(t){
+  t = t.replace(/\b([A-Z][a-z]?)-(\d{1,3})(m\d?)?\b/g, function(all,sym,a,meta){
+    if(!isNuclide(sym,+a)) return all;
+    return ELN[sym]+' '+(+a)+(meta? ' '+meta : '');
+  });
+  t = t.replace(/(^|[\s(\[\/"'“])(\d{1,3})(m\d?)?([A-Z][a-z]?)(?=$|[\s),.;:\]\/"'”?!-])/g,
+    function(all,pre,a,meta,sym){
+      if(!isNuclide(sym,+a)) return all;
+      return pre+ELN[sym]+' '+(+a)+(meta? ' '+meta : '');
+    });
+  return t;
+}
+
+/* 単位・化学式（順序が重要：長いものから先に） */
+var _UNITS = [
+  [/\bmSv\s*\/\s*h\b/g,'millisieverts per hour'],
+  [/\b(?:μSv|uSv)\s*\/\s*h\b/g,'microsieverts per hour'],
+  [/\bmSv\s*\/\s*y\b/g,'millisieverts per year'],
+  [/\bmSv\b/g,'millisieverts'], [/\b(?:μSv|uSv)\b/g,'microsieverts'], [/\bSv\b/g,'sieverts'],
+  [/\bTBq\b/g,'terabecquerels'], [/\bGBq\b/g,'gigabecquerels'],
+  [/\bMBq\b/g,'megabecquerels'], [/\bkBq\b/g,'kilobecquerels'],
+  [/\bBq\s*\/\s*(?:g|kg|cm3|cm³)\b/g,'becquerels per gram'], [/\bBq\b/g,'becquerels'],
+  [/\bMWe\b/g,'megawatts electric'], [/\bMWt\b/g,'megawatts thermal'], [/\bMW\b/g,'megawatts'],
+  [/\bkWh\b/g,'kilowatt hours'], [/\bkW\b/g,'kilowatts'], [/\bGW\b/g,'gigawatts'],
+  [/\bm3\b|m³/g,'cubic metres'], [/\bm2\b|m²/g,'square metres'],
+  [/\bCO2\b/g,'carbon dioxide'], [/\bH2O\b/g,'H two O'], [/\bN2\b/g,'N two'],
+  [/\bS\s*\/\s*C\b/g,'S C']
+];
+function readUnits(t){
+  for(var i=0;i<_UNITS.length;i++) t=t.replace(_UNITS[i][0], _UNITS[i][1]);
+  /* 「1 millisieverts」のような複数形のずれを直す */
+  t=t.replace(/(^|[^\d.,])1\s+(millisievert|microsievert|sievert|becquerel|megawatt|kilowatt|gigawatt|cubic metre|square metre|kilowatt hour)s\b/g,
+              function(all,pre,w){ return pre+'1 '+w; });
+  return t;
+}
+
+/* 利用者が追加する置換ルール（1行1件） */
+function parseRules(src){
+  var out=[], lines=String(src||'').split(/\n/);
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    if(!line || line.charAt(0)==='#') continue;
+    var k=line.indexOf('=>');
+    if(k<0) continue;
+    var from=line.slice(0,k).trim(), to=line.slice(k+2).trim();
+    if(!from) continue;
+    var m=from.match(/^\/(.*)\/([gimsu]*)$/);
+    try{
+      if(m) out.push([new RegExp(m[1], m[2].indexOf('g')<0 ? m[2]+'g' : m[2]), to]);
+      else   out.push([new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'), to]);
+    }catch(e){ /* 書式の誤りは無視する */ }
+  }
+  return out;
+}
+var _rulesCache={src:null, list:[]};
+function customRules(){
+  if(_rulesCache.src!==ST.cfg.rdRules){ _rulesCache.src=ST.cfg.rdRules; _rulesCache.list=parseRules(ST.cfg.rdRules); }
+  return _rulesCache.list;
+}
+/** 表示用テキスト → 読み上げ用テキスト（自分のルール → 核種 → 単位 の順） */
+function toSpeech(t){
+  if(!t) return '';
+  var r=customRules();
+  for(var i=0;i<r.length;i++) t=t.replace(r[i][0], r[i][1]);
+  if(ST.cfg.rdNuclide) t=readNuclides(t);
+  if(ST.cfg.rdUnit)    t=readUnits(t);
+  return t.replace(/\s{2,}/g,' ').trim();
+}
+
+/* 読み上げ用テキスト（ラベルは読まない）。置換が入った場合は単語ハイライトを止める */
+function speakText(ph){
+  if(!ph) return '';
+  var out=toSpeech(ph.t);
+  SP.hlOk = !isRead(ph.t);
+  return out;
+}
+/* 読み替えが実際に起きたか（空白の詰めだけの差は数えない） */
+function isRead(t){ return toSpeech(t) !== String(t).replace(/\s{2,}/g,' ').trim(); }
 
 /**
  * 1フレーズ発話。done(ok) で完了通知。
@@ -793,7 +922,7 @@ function speakOne(text, done){
     }
     setTimeout(function(){ finish(false); },0);
   };
-  if(ST.cfg.wordHl){
+  if(ST.cfg.wordHl && SP.hlOk!==false){
     u.onboundary=function(ev){
       SP.boundarySeen=true;
       if(ev.name==='word'||ev.name===undefined) hlWord(ev.charIndex, ev.charLength);
@@ -1074,6 +1203,7 @@ function renderPractice(){
   m.appendChild(el('span','chip',wc(ph.t)+' 語'));
   m.appendChild(el('span','chip','練習 '+(p.counts[ST.idx]||0)+' 回'));
   if(p.stars[ST.idx]) m.appendChild(el('span','chip','★ 苦手'));
+  if(isRead(ph.t)) m.appendChild(el('span','chip','読み替えあり'));
   if(SP.abA!=null) m.appendChild(el('span','chip','A='+(SP.abA+1)+(SP.abB!=null?' B='+(SP.abB+1):'')));
   if(REC.on) m.appendChild(el('span','chip pri','● 録音中'));
 
@@ -1253,6 +1383,7 @@ function afterCfg(key){
   if(key==='theme') document.documentElement.setAttribute('data-theme',ST.cfg.theme);
   if(key==='fs') document.documentElement.setAttribute('data-fs',ST.cfg.fs);
   if(key==='maskMode'||key==='showJa'||key==='wordHl') renderPractice();
+  if(key==='rdNuclide'||key==='rdUnit'){ renderPractice(); if($('rdPreview')) rdShow(); }
   if(key==='targetMin') tickClock();
 }
 
@@ -1350,9 +1481,31 @@ $('voiceSel').addEventListener('change', function(){ ST.cfg.voiceURI=this.value;
 $('btnReloadVoices').addEventListener('click', function(){ prime(); SP.voices=[]; loadVoices(function(){ renderVoiceList(); setSpeakState('英語音声 '+enVoices().length+' 件を取得しました。'); }); });
 $('btnTestVoice').addEventListener('click', function(){
   prime();
-  speakOne('This is a test of the selected English voice. Approximately one thousand five hundred cubic metres.', function(ok){
+  SP.hlOk=true;
+  speakOne(toSpeech('This is a test of the selected English voice. The sample contains Cl-36 and C-14, and the dose rate is 10 mSv/h.'), function(ok){
     if(ok) setSpeakState('テスト発話を実行しました。音が出ない場合は消音スイッチと音量を確認してください。');
   });
+});
+function rdShow(){
+  var ph=phrases()[ST.idx];
+  if(!ph){ $('rdPreview').textContent='原稿がありません。'; return ''; }
+  var out=toSpeech(ph.t);
+  $('rdPreview').textContent = (!isRead(ph.t))
+    ? '読み替えなし：\n' + ph.t
+    : '表示：\n' + ph.t + '\n\n読み上げ：\n' + out;
+  return out;
+}
+$('btnRdSave').addEventListener('click', function(){
+  ST.cfg.rdRules=$('rdRules').value; save();
+  var n=parseRules(ST.cfg.rdRules).length;
+  rdShow(); renderPractice();
+  setSpeakState('置換ルールを '+n+' 件 保存しました。');
+  alert('置換ルールを '+n+' 件 保存しました。');
+});
+$('btnRdTest').addEventListener('click', rdShow);
+$('btnRdSpeak').addEventListener('click', function(){
+  prime(); var out=rdShow();
+  if(out){ SP.hlOk=true; speakOne(out, function(){}); }
 });
 $('btnResetTimer').addEventListener('click', function(){
   var p=prog(); p.total=0; p.secTime={}; TM.t0=Date.now(); TM.secStart=Date.now(); save(); tickClock(); renderRecord();
@@ -1460,6 +1613,8 @@ function init(){
   bindCfg('maxWords','maxWords'); bindCfg('targetMin','targetMin');
   bindCfg('autoNext','autoNext','chk'); bindCfg('speakHeads','speakHeads','chk');
   bindCfg('autoRec','autoRec','chk'); bindCfg('showJa','showJa','chk');
+  bindCfg('rdNuclide','rdNuclide','chk'); bindCfg('rdUnit','rdUnit','chk');
+  $('rdRules').value=ST.cfg.rdRules||'';
   bindCfg('wordHl','wordHl','chk'); bindCfg('splitNum','splitNum','chk'); bindCfg('splitPrio','splitPrio','chk');
   ['rate','pitch','vol','gap','theme','fs','targetMin'].forEach(afterCfg);
 
@@ -1496,7 +1651,8 @@ function init(){
 window.__pps = {
   splitSentences:splitSentences, subSplit:subSplit, parseScript:parseScript, flatten:flatten,
   ST:ST, SP:SP, speakOne:speakOne, SAMPLE:SAMPLE, version:APP_VERSION, save:save, load:load,
-  renderAll:renderAll, go:go, buildScript:buildScript
+  renderAll:renderAll, go:go, buildScript:buildScript,
+  toSpeech:toSpeech, readNuclides:readNuclides, readUnits:readUnits, parseRules:parseRules, isNuclide:isNuclide, isRead:isRead
 };
 
 init();
