@@ -48,7 +48,6 @@ header{
 }
 header .ttl{font-weight:700;font-size:.92em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header .sname{font-size:.76em;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-header .clock{font-variant-numeric:tabular-nums;font-size:.82em;color:var(--sub);white-space:nowrap}
 main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 10px 14px}
 .view{display:none} .view.on{display:block}
 nav#tabbar{
@@ -101,9 +100,10 @@ input[type=range]{width:100%;height:36px}
   font-size:1.55em; line-height:1.55; font-weight:600; letter-spacing:.01em;
   min-height:22vh;
 }
+#phrase.len-m>#phraseInner{font-size:.84em}
+#phrase.len-l>#phraseInner{font-size:.7em}
 #phrase>#phraseInner{ width:100%; white-space:pre-wrap; word-break:normal; overflow-wrap:break-word; }
 #phrase .w.hl{background:rgba(31,111,235,.22);border-radius:4px}
-#phrase.masked{color:var(--sub);font-weight:500}
 #phraseJa{font-size:.85em;color:var(--sub);margin-top:10px;line-height:1.6;display:none}
 #meta{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.74em;color:var(--sub);flex-wrap:wrap}
 #bar{height:5px;background:var(--chip);border-radius:3px;overflow:hidden;margin-top:10px}
@@ -118,7 +118,6 @@ input[type=range]{width:100%;height:36px}
 .item .n{flex:0 0 auto;color:var(--sub);font-size:.82em;min-width:2.6em;font-variant-numeric:tabular-nums}
 .item .t{flex:1 1 auto}
 .item.cur{background:var(--chip)}
-.item .st{flex:0 0 auto;color:var(--star)}
 .item.sec{font-weight:700;background:var(--chip)}
 /* split editor */
 .pr{display:flex;gap:6px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--line);font-size:.82em;line-height:1.5}
@@ -127,15 +126,12 @@ input[type=range]{width:100%;height:36px}
 .pr .ops{flex:0 0 auto;display:flex;gap:4px;flex-direction:column}
 .pr.long .t{color:var(--warn)}
 .ver{position:fixed;right:5px;bottom:calc(env(safe-area-inset-bottom) + 58px);font-size:.6em;color:var(--sub);opacity:.7;pointer-events:none}
-table.rec{width:100%;border-collapse:collapse;font-size:.78em}
-table.rec th,table.rec td{border-bottom:1px solid var(--line);padding:5px 4px;text-align:left}
-table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
 /* iPad landscape: two columns */
 @media (orientation:landscape) and (min-width:900px){
   main{padding:12px 14px}
   #practiceWrap{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;align-items:start}
-  #stage{min-height:62vh}
-  #phrase{font-size:1.9em;min-height:40vh}
+  #stage{min-height:auto}
+  #phrase{font-size:1.9em;min-height:34vh}
   nav#tabbar button{font-size:.8em}
 }
 @media (min-width:700px){ main{max-width:980px;margin:0 auto;width:100%} .pr .ops{flex-direction:row} }
@@ -147,7 +143,6 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
 <header>
   <span class="ttl">発声練習</span>
   <span class="sname" id="hdrScript">—</span>
-  <span class="clock" id="hdrClock">00:00</span>
 </header>
 
 <main>
@@ -177,20 +172,9 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
         <button class="btn sm" id="btnTop">◀◀ 最初から</button>
         <button class="btn sm" id="btnSecTop">◀ このセクションの頭</button>
       </div>
-      <div class="grid3" style="margin-top:7px">
-        <button class="btn sm" id="btnRepeat">↻ リピート</button>
-        <button class="btn sm" id="btnShadow">♪ シャドー</button>
+      <div class="grid2" style="margin-top:7px">
+        <button class="btn sm" id="btnShadow">♪ シャドーイング</button>
         <button class="btn sm" id="btnStop">■ 停止</button>
-      </div>
-      <div class="grid3" style="margin-top:7px">
-        <button class="btn sm" id="btnStar">★ 苦手</button>
-        <button class="btn sm" id="btnAB">A-B区間</button>
-        <button class="btn sm" id="btnMask">◐ 表示切替</button>
-      </div>
-      <div class="grid3" style="margin-top:7px">
-        <button class="btn sm" id="btnRec">● 録音</button>
-        <button class="btn sm" id="btnPlayRec">▷ 自分の声</button>
-        <button class="btn sm" id="btnCompare">⇄ 交互再生</button>
       </div>
     </div>
     <div>
@@ -205,17 +189,16 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
         </div>
         <label>フレーズ間のポーズ <span id="vGap">0.6</span> 秒</label>
         <input type="range" id="gap" min="0" max="3" step="0.1" value="0.6">
-        <label>リピート回数</label>
-        <select id="repeatN"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>10</option></select>
-        <label>リピートのしかた（↻ ボタン）</label>
-        <select id="repeatScope"><option value="one">いまのフレーズだけを繰り返す</option><option value="each">各フレーズを指定回数ずつ、順に進む</option></select>
+        <label>リピート回数（各フレーズを何回ずつ読むか）</label>
+        <select id="repeatN"><option value="1">1回（繰り返さない）</option><option value="2">2回</option><option value="3">3回</option><option value="5">5回</option><option value="10">10回</option></select>
+        <p class="note" style="margin:4px 0 0">▶ 再生とシャドーイングの両方に効きます。各フレーズを指定回数ずつ読んでから次へ進みます。</p>
         <label><input type="checkbox" id="autoNext" checked> 読み上げ後に自動で次へ進む</label>
         <label><input type="checkbox" id="loopAll"> 最後まで行ったら最初に戻って繰り返す</label>
         <label><input type="checkbox" id="speakHeads"> 見出し行も読み上げる</label>
         <div id="fileOpts" style="display:none">
           <label>音声ファイルで再生する範囲</label>
-          <select id="fileRange"><option value="all">原稿全体</option><option value="sec">いまのセクションだけ</option><option value="star">★ 苦手だけ</option></select>
-          <p class="note">音声ファイル方式では、フレーズ間のポーズやシャドーイングの無音も音声の中に入れて1本にまとめて再生します。そのため画面をロックしても止まらず、ロック画面の「前へ／次へ」ボタンでフレーズを移動できます。ポーズ・無音の長さ、リピート回数・しかた、範囲を変えると、いまのフレーズの頭から自動で作り直して続けます。</p>
+          <select id="fileRange"><option value="all">原稿全体</option><option value="sec">いまのセクションだけ</option></select>
+          <p class="note">音声ファイル方式では、フレーズ間のポーズやシャドーイングの無音も音声の中に入れて1本にまとめて再生します。そのため画面をロックしても止まらず、ロック画面の「前へ／次へ」ボタンでフレーズを移動できます。ポーズ・無音の長さ、リピート回数、範囲を変えると、いまのフレーズの頭から自動で作り直して続けます。</p>
         </div>
       </div>
       <div class="card">
@@ -227,8 +210,7 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
           <option value="1.5">1.5 倍</option>
           <option value="2">2 倍</option>
         </select>
-        <label><input type="checkbox" id="autoRec"> 無音の間に自動で録音する</label>
-        <p class="note">シャドーイングは「読み上げ → 無音 → 次のフレーズ」を自動で繰り返します。停止は「■ 停止」。</p>
+        <p class="note">シャドーイングは「読み上げ → 無音（自分が発声）」をリピート回数ぶん繰り返してから次のフレーズへ進みます。もう一度押すか「■ 停止」で止まります。</p>
       </div>
     </div>
   </div>
@@ -271,7 +253,7 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
       <button class="btn" id="btnReSplit">この設定で再分割</button>
       <button class="btn" id="btnShowSplit">分割結果を確認・修正</button>
     </div>
-    <p class="note">再分割すると手動修正（結合／分割）はリセットされます。練習回数と★は維持されません（フレーズ番号が変わるため）。</p>
+    <p class="note">再分割すると手動修正（結合／分割）はリセットされます。</p>
   </div>
   <div class="card" id="audioCard">
     <h2>音声ファイル（ロック中も再生するための準備）</h2>
@@ -317,11 +299,6 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
   </div>
   <div class="card">
     <h2>フレーズ一覧</h2>
-    <div class="row" style="margin-bottom:8px">
-      <button class="btn sm" id="fltAll">すべて</button>
-      <button class="btn sm" id="fltStar">★ 苦手のみ</button>
-      <button class="btn sm" id="fltUn">未練習のみ</button>
-    </div>
     <div id="phList"></div>
   </div>
 </section>
@@ -369,54 +346,15 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
     <select id="theme"><option value="auto">端末に合わせる</option><option value="light">ライト</option><option value="dark">ダーク</option></select>
     <label>文字サイズ</label>
     <select id="fs"><option value="1">小</option><option value="2" selected>中</option><option value="3">大</option><option value="4">特大</option></select>
-    <label>テキストの表示</label>
-    <select id="maskMode">
-      <option value="full">全文を表示</option>
-      <option value="key">キーワードのみ表示</option>
-      <option value="none">非表示（音だけ）</option>
-    </select>
     <label><input type="checkbox" id="showJa"> 和訳を表示（原稿に @@ で和訳がある場合）</label>
     <label><input type="checkbox" id="wordHl" checked> 読み上げ中の単語をハイライト（iOS では動かない場合があります）</label>
   </div>
   <div class="card">
-    <h2>時間管理</h2>
-    <label>全体の目標時間（分）</label>
-    <input type="number" id="targetMin" min="0" step="1" value="20">
-    <p class="note" id="timeStat"></p>
-    <div class="row"><button class="btn sm" id="btnResetTimer">計測をリセット</button></div>
-  </div>
-  <div class="card">
     <h2>キーボード（iPad 外付けキーボード）</h2>
-    <p class="note">space＝読み上げ／停止、→ ←＝次／前、Home＝最初から、R＝リピート、S＝★、H＝表示切替、Shift+S＝シャドーイング</p>
-  </div>
-  <div class="card">
-    <h2>この端末のデータ</h2>
-    <div class="row">
-      <button class="btn sm" id="btnExport">練習記録を書き出す（JSON）</button>
-      <button class="btn sm" id="btnExportCsv">CSV で書き出す</button>
-    </div>
-    <div class="row" style="margin-top:7px">
-      <button class="btn sm" id="btnClear">この端末の保存データを全消去</button>
-    </div>
-    <p class="note" id="envNote"></p>
+    <p class="note">space＝再生／停止、→ ←＝次／前、Home＝最初から、S＝シャドーイング</p>
   </div>
 </section>
 
-<!-- ============ 記録 ============ -->
-<section class="view" id="view-record">
-  <div class="card">
-    <h2>進捗</h2>
-    <div id="recSummary"></div>
-  </div>
-  <div class="card">
-    <h2>セクションごとの実測時間</h2>
-    <div id="recSections"></div>
-  </div>
-  <div class="card">
-    <h2>★ 苦手フレーズ</h2>
-    <div id="recStars"></div>
-  </div>
-</section>
 </main>
 
 <nav id="tabbar">
@@ -424,7 +362,6 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
   <button data-v="script"><span class="ic">☰</span>原稿</button>
   <button data-v="toc"><span class="ic">☷</span>目次</button>
   <button data-v="settings"><span class="ic">⚙</span>設定</button>
-  <button data-v="record"><span class="ic">▤</span>記録</button>
 </nav>
 <div class="ver" id="verTag"></div>
 
@@ -434,7 +371,7 @@ table.rec td.num{text-align:right;font-variant-numeric:tabular-nums}
    機密情報はこのファイルに一切含めません。原稿は端末の localStorage のみ。
    ========================================================================= */
 "use strict";
-var APP_VERSION = "v1.3.0 (2026-10-05)";
+var APP_VERSION = "v1.4.0 (2026-10-06)";
 
 /* ---------- エラー表示 ---------- */
 function showErr(msg){
@@ -688,13 +625,12 @@ var ST = {
   scripts: [],          /* [{id,name,raw,phrases:[],secTitles:[],opt:{}}] */
   activeId: null,
   idx: 0,
-  prog: {},             /* prog[scriptId] = {counts:{}, stars:{}, secTime:{}, total:0} */
   cfg: {
-    rate:1, pitch:1, vol:1, gap:0.6, repeatN:3, autoNext:true, speakHeads:false,
-    silFactor:1, autoRec:false, voiceURI:'', theme:'auto', fs:'2',
-    maskMode:'full', showJa:false, wordHl:true, targetMin:20,
+    rate:1, pitch:1, vol:1, gap:0.6, repeatN:1, autoNext:true, speakHeads:false,
+    silFactor:1, voiceURI:'', theme:'auto', fs:'2',
+    showJa:false, wordHl:true,
     rdNuclide:true, rdUnit:true, rdRules:'',
-    playMode:'tts', fileRange:'all', keepAwake:true, lockText:false, macVoice:'Daniel', repeatScope:'one', loopAll:false,
+    playMode:'tts', fileRange:'all', keepAwake:true, lockText:false, macVoice:'Daniel', loopAll:false,
     maxWords:12, splitNum:true, splitPrio:true
   }
 };
@@ -702,7 +638,7 @@ var ST = {
 function save(){
   try{
     localStorage.setItem(LSK, JSON.stringify({
-      scripts:ST.scripts, activeId:ST.activeId, idx:ST.idx, prog:ST.prog, cfg:ST.cfg, v:APP_VERSION
+      scripts:ST.scripts, activeId:ST.activeId, idx:ST.idx, cfg:ST.cfg, v:APP_VERSION
     }));
     return true;
   }catch(e){ showErr('保存に失敗: '+e.message+'（端末の空き容量やプライベートブラウズを確認してください）'); return false; }
@@ -715,8 +651,8 @@ function load(){
     if(o.scripts) ST.scripts=o.scripts;
     if(o.activeId) ST.activeId=o.activeId;
     if(typeof o.idx==='number') ST.idx=o.idx;
-    if(o.prog) ST.prog=o.prog;
-    if(o.cfg) for(var k in o.cfg) ST.cfg[k]=o.cfg[k];
+    if(o.cfg) for(var k in o.cfg) if(k in ST.cfg) ST.cfg[k]=o.cfg[k];   /* 廃止した設定は読み込まない */
+    if(ST.cfg.fileRange!=='all' && ST.cfg.fileRange!=='sec') ST.cfg.fileRange='all';
     return true;
   }catch(e){ showErr('保存データの読み込みに失敗: '+e.message); return false; }
 }
@@ -725,14 +661,6 @@ function activeScript(){
   return null;
 }
 function phrases(){ var s=activeScript(); return s? s.phrases : []; }
-function prog(){
-  if(!ST.activeId) return {counts:{},stars:{},secTime:{},total:0};
-  if(!ST.prog[ST.activeId]) ST.prog[ST.activeId]={counts:{},stars:{},secTime:{},total:0};
-  var p=ST.prog[ST.activeId];
-  p.counts=p.counts||{}; p.stars=p.stars||{}; p.secTime=p.secTime||{}; p.total=p.total||0;
-  return p;
-}
-
 /* 最初の本文（見出しでない）フレーズの位置 */
 function firstBody(s){
   if(!s||!s.phrases) return 0;
@@ -756,10 +684,9 @@ function buildScript(name, raw){
    ========================================================================= */
 var SP = {
   voices:[], primed:false, boundarySeen:false, hlOk:true,
-  mode:null,            /* null | 'one' | 'seq' | 'repeat' | 'shadow' | 'ab' */
+  mode:null,            /* null | 'one' | 'seq' | 'shadow' */
   stopFlag:false, timer:null, watchdog:null,
-  curUtt:null, t0:0, lastDur:0,
-  abA:null, abB:null, repLeft:0
+  curUtt:null, t0:0, lastDur:0, repDone:0, atEnd:false, lastKind:null
 };
 var synth = window.speechSynthesis || null;
 
@@ -816,12 +743,11 @@ function prime(){
 }
 
 function stopSpeak(){
-  SP.stopFlag=true; SP.mode=null; SP.repLeft=0;
+  SP.stopFlag=true; SP.mode=null; SP.repDone=0;
   if(SP.timer){ clearTimeout(SP.timer); SP.timer=null; }
   if(SP.watchdog){ clearInterval(SP.watchdog); SP.watchdog=null; }
   try{ if(synth) synth.cancel(); }catch(e){}
   SP.curUtt=null;
-  stopRec(true);
   setSpeakState('');
   renderPractice();
 }
@@ -1015,17 +941,10 @@ function hlWord(ci){
   }
 }
 
-/* ---- 再生シナリオ ---- */
-function bump(i){
-  var p=prog(); p.counts[i]=(p.counts[i]||0)+1; save();
-}
-function playOne(){
-  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode='one';
-  var ph=phrases()[ST.idx]; if(!ph) return;
-  if(ph.head && !ST.cfg.speakHeads){ nextPhrase(); return; }
-  renderPractice();
-  speakOne(speakText(ph), function(){ bump(ST.idx); SP.mode=null; renderPractice(); });
-}
+/* ---- 再生シナリオ ----
+   どの再生方法でも、各フレーズを「リピート回数」ぶん読んでから次へ進む（1回なら繰り返さない）。
+   回数は1回ごとに読み直すので、再生中に変えてもすぐ反映される。 */
+function repN(){ return Math.max(1, parseInt(ST.cfg.repeatN,10)||1); }
 /* 原稿の最後に来たとき：ループ設定なら最初に戻って続け、そうでなければ止めて「もう一度」を出す */
 function endOrLoop(step, msg){
   if(ST.cfg.loopAll){
@@ -1040,170 +959,63 @@ function endOrLoop(step, msg){
 }
 function ttsStart(kind){
   if(kind==='shadow') playShadow();
-  else if(kind==='repeat'){ if(ST.cfg.repeatScope==='each') playRepeatEach(); else playRepeat(); }
   else if(kind==='one') playOne();
   else if(ST.cfg.autoNext) playSeq(); else playOne();
 }
-function playSeq(){
-  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode='seq';
-  step();
-  function step(){
-    if(SP.stopFlag||SP.mode!=='seq') return;
-    var list=phrases(), ph=list[ST.idx];
-    if(!ph){ SP.mode=null; renderPractice(); return; }
-    if(ph.head && !ST.cfg.speakHeads){
-      if(ST.idx>=list.length-1){ endOrLoop(step,'最後まで読み上げました。'); return; }
-      ST.idx++; renderPractice(); SP.timer=setTimeout(step,10); return;
-    }
+/* 見出しを飛ばす（最後なら終わり処理）。飛ばしたら true */
+function skipHead(step, kind){
+  var list=phrases(), ph=list[ST.idx];
+  if(!ph || !ph.head || ST.cfg.speakHeads) return false;
+  if(ST.idx>=list.length-1){ if(kind==='one'){ SP.mode=null; renderPractice(); } else endOrLoop(step,'最後まで読み上げました。'); return true; }
+  ST.idx++; SP.repDone=0; renderPractice(); SP.timer=setTimeout(step,10); return true;
+}
+/* このフレーズを回数ぶん読み終えたら次へ（1フレーズのときは止める）。進んだら true */
+function nextIfDone(step, kind, msgEnd){
+  var list=phrases(), n=repN();
+  if(SP.repDone<n) return false;
+  if(kind==='one'){ SP.mode=null; setSpeakState(n>1?'リピート '+n+' 回 終了':''); renderPractice(); return true; }
+  if(ST.idx>=list.length-1){ endOrLoop(step, msgEnd); return true; }
+  ST.idx++; SP.repDone=0; save(); renderPractice(); SP.timer=setTimeout(step,10); return true;
+}
+/* ▶ 再生（自動で次へ ON＝通し、OFF＝いまのフレーズだけ） */
+function playTTS(kind){
+  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode=kind; SP.repDone=0;
+  (function step(){
+    if(SP.stopFlag||SP.mode!==kind) return;
+    if(!phrases()[ST.idx]){ SP.mode=null; renderPractice(); return; }
+    if(skipHead(step, kind)) return;
+    if(nextIfDone(step, kind, '最後まで読み上げました。')) return;
     renderPractice();
-    speakOne(speakText(ph), function(){
-      bump(ST.idx);
-      if(SP.stopFlag||SP.mode!=='seq') return;
-      if(ST.idx>=list.length-1){ endOrLoop(step,'最後まで読み上げました。'); return; }
-      ST.idx++; save();
-      SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000));
-    });
-  }
-}
-function repN(){ return Math.max(1, parseInt(ST.cfg.repeatN,10)||1); }
-/* ↻ いまのフレーズだけを n 回（回数は毎回読み直すので、途中で変えても反映される） */
-function playRepeat(){
-  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode='repeat'; SP.repDone=0;
-  var ph=phrases()[ST.idx]; if(!ph) return;
-  if(ph.head){ var nb=bodyIdx(function(p,i){ return i>ST.idx; })[0]; if(nb==null) return; ST.idx=nb; ph=phrases()[nb]; }
-  renderPractice();
-  (function step(){
-    if(SP.stopFlag||SP.mode!=='repeat') return;
-    var n=repN();
-    if(SP.repDone>=n){ SP.mode=null; setSpeakState('リピート '+n+' 回 終了'); renderPractice(); return; }
-    setSpeakState('リピート '+(SP.repDone+1)+' / '+n+' 回目'); renderPractice();
-    speakOne(speakText(ph), function(){
-      bump(ST.idx); SP.repDone++;
-      if(SP.stopFlag||SP.mode!=='repeat') return;
-      SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000));
+    speakOne(speakText(phrases()[ST.idx]), function(){
+      SP.repDone++;
+      if(SP.stopFlag||SP.mode!==kind) return;
+      var last=(SP.repDone>=repN()) && (kind==='one' || ST.idx>=phrases().length-1);
+      SP.timer=setTimeout(step, last?0:Math.round(ST.cfg.gap*1000));
     });
   })();
 }
-/* ↻ 各フレーズを n 回ずつ、順に進む */
-function playRepeatEach(){
-  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode='repeat'; SP.repDone=0;
-  (function step(){
-    if(SP.stopFlag||SP.mode!=='repeat') return;
-    var list=phrases(), ph=list[ST.idx], n=repN();
-    if(!ph){ SP.mode=null; renderPractice(); return; }
-    if(ph.head || SP.repDone>=n){
-      if(ST.idx>=list.length-1){ endOrLoop(step,'最後まで練習しました。'); return; }
-      ST.idx++; SP.repDone=0; save(); renderPractice();
-      SP.timer=setTimeout(step, ph.head?10:Math.round(ST.cfg.gap*1000)); return;
-    }
-    setSpeakState('リピート '+(SP.repDone+1)+' / '+n+' 回目'); renderPractice();
-    speakOne(speakText(ph), function(){
-      bump(ST.idx); SP.repDone++;
-      if(SP.stopFlag||SP.mode!=='repeat') return;
-      SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000));
-    });
-  })();
-}
-function playAB(){
-  if(SP.abA==null||SP.abB==null) return;
-  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode='ab';
-  ST.idx=SP.abA;
-  (function step(){
-    if(SP.stopFlag||SP.mode!=='ab') return;
-    var ph=phrases()[ST.idx];
-    if(!ph||ST.idx>SP.abB){ ST.idx=SP.abA; SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000)); return; }
-    renderPractice();
-    setSpeakState('A-B区間リピート（'+(SP.abA+1)+'〜'+(SP.abB+1)+'）');
-    speakOne(speakText(ph), function(){
-      bump(ST.idx);
-      if(SP.stopFlag||SP.mode!=='ab') return;
-      ST.idx = (ST.idx>=SP.abB) ? SP.abA : ST.idx+1;
-      SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000));
-    });
-  })();
-}
+function playSeq(){ playTTS('seq'); }
+function playOne(){ playTTS('one'); }
+/* ♪ シャドーイング：読み上げ → 無音（自分が発声）を回数ぶん → 次のフレーズ */
 function playShadow(){
-  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode='shadow';
+  prime(); wakeOn(); SP.atEnd=false; SP.stopFlag=false; SP.mode='shadow'; SP.repDone=0;
   (function step(){
     if(SP.stopFlag||SP.mode!=='shadow') return;
-    var list=phrases(), ph=list[ST.idx];
-    if(!ph){ SP.mode=null; renderPractice(); return; }
-    if(ph.head && !ST.cfg.speakHeads){
-      if(ST.idx>=list.length-1){ endOrLoop(step,'最後まで読み上げました。'); return; }
-      ST.idx++; renderPractice(); SP.timer=setTimeout(step,10); return;
-    }
+    if(!phrases()[ST.idx]){ SP.mode=null; renderPractice(); return; }
+    if(skipHead(step, 'shadow')) return;
+    if(nextIfDone(step, 'shadow', '最後まで練習しました。')) return;
     renderPractice();
-    speakOne(speakText(ph), function(){
-      bump(ST.idx);
+    speakOne(speakText(phrases()[ST.idx]), function(){
       if(SP.stopFlag||SP.mode!=='shadow') return;
       var sil=Math.max(700, Math.round(SP.lastDur*(+ST.cfg.silFactor||1)));
       setSpeakState('どうぞ発声してください（'+(sil/1000).toFixed(1)+'秒）');
-      if(ST.cfg.autoRec) startRec();
       SP.timer=setTimeout(function(){
-        if(ST.cfg.autoRec) stopRec();
+        SP.repDone++;
         if(SP.stopFlag||SP.mode!=='shadow') return;
-        if(ST.idx>=list.length-1){ endOrLoop(step,'最後まで練習しました。'); return; }
-        ST.idx++; save();
         SP.timer=setTimeout(step, Math.round(ST.cfg.gap*1000));
       }, sil);
     });
   })();
-}
-
-/* =========================================================================
-   4. 録音（MediaRecorder）
-   ========================================================================= */
-var REC={ stream:null, mr:null, chunks:[], url:null, on:false, audio:null };
-function startRec(){
-  if(REC.on) return;
-  if(!navigator.mediaDevices||!window.MediaRecorder){ setSpeakState('この端末/ブラウザは録音に対応していません。'); return; }
-  function go(stream){
-    REC.stream=stream; REC.chunks=[];
-    var types=['audio/mp4','audio/webm;codecs=opus','audio/webm',''];
-    var mr=null;
-    for(var i=0;i<types.length;i++){
-      try{ mr = types[i] ? new MediaRecorder(stream,{mimeType:types[i]}) : new MediaRecorder(stream); break; }catch(e){}
-    }
-    if(!mr){ setSpeakState('録音の初期化に失敗しました。'); return; }
-    REC.mr=mr;
-    mr.ondataavailable=function(e){ if(e.data&&e.data.size) REC.chunks.push(e.data); };
-    mr.onstop=function(){
-      try{
-        if(REC.url) URL.revokeObjectURL(REC.url);
-        var blob=new Blob(REC.chunks,{type:(REC.chunks[0]&&REC.chunks[0].type)||'audio/mp4'});
-        REC.url=URL.createObjectURL(blob);
-      }catch(e){ showErr('録音の保存に失敗: '+e.message); }
-      renderPractice();
-    };
-    mr.start();
-    REC.on=true; renderPractice();
-  }
-  if(REC.stream && REC.stream.active){ go(REC.stream); return; }
-  navigator.mediaDevices.getUserMedia({audio:true}).then(go).catch(function(e){
-    setSpeakState('マイクを使用できません（'+e.name+'）。設定でマイク許可を確認してください。https でのみ利用できます。');
-  });
-}
-function stopRec(silent){
-  if(!REC.on) return;
-  REC.on=false;
-  try{ if(REC.mr && REC.mr.state!=='inactive') REC.mr.stop(); }catch(e){}
-  if(!silent) setSpeakState('録音しました。「▷ 自分の声」で再生できます。');
-  renderPractice();
-}
-function playRec(cb){
-  if(!REC.url){ setSpeakState('録音がありません。「● 録音」で録音してください。'); if(cb)cb(); return; }
-  if(!REC.audio) REC.audio=new Audio();
-  REC.audio.src=REC.url;
-  REC.audio.onended=function(){ if(cb)cb(); };
-  REC.audio.play().catch(function(e){ setSpeakState('再生できません: '+e.message); if(cb)cb(); });
-}
-function compare(){
-  prime();
-  var ph=phrases()[ST.idx]; if(!ph) return;
-  setSpeakState('手本 → 自分の声');
-  speakOne(speakText(ph), function(){
-    setTimeout(function(){ playRec(function(){ setSpeakState(''); }); }, 350);
-  });
 }
 
 /* =========================================================================
@@ -1384,8 +1196,8 @@ function readAB(f){
 
 /* ---- (2) 音声ファイル方式の再生エンジン ---- */
 var AUD={sig:'', repN:0, curK:-1, rebuildT:null, el:null, url:null, map:[], kind:null, cache:{}, sr:0, lastT:0, building:false, cov:null, after:null, silentUrl:null};
-var KIND_L={seq:'通し再生', one:'1フレーズ', repeat:'リピート', shadow:'シャドーイング', ab:'A-B区間'};
-var RANGE_L={all:'原稿全体', sec:'いまのセクション', star:'★ 苦手だけ'};
+var KIND_L={seq:'通し再生', one:'このフレーズ', shadow:'シャドーイング'};
+var RANGE_L={all:'原稿全体', sec:'いまのセクション'};
 function isFile(){ return ST.cfg.playMode==='file'; }
 
 function audEl(){
@@ -1402,7 +1214,7 @@ function audEl(){
     syncFromAudio(false); mediaState('none');
     var f=AUD.after; AUD.after=null;
     if(f) f();
-    else if(AUD.kind==='seq'||AUD.kind==='shadow'||(AUD.kind==='repeat'&&ST.cfg.repeatScope==='each')){ AUD.atEnd=true; setSpeakState('最後まで再生しました。「↺ もう一度」で最初から再生できます。'); }
+    else if(AUD.kind==='seq'||AUD.kind==='shadow'){ AUD.atEnd=true; setSpeakState('最後まで再生しました。「↺ もう一度」で最初から再生できます。'); }
     else setSpeakState('再生が終わりました。');
     renderPractice();
   });
@@ -1435,11 +1247,8 @@ function stopAudio(){
 function bodyIdx(filter){ var l=phrases(), out=[]; for(var i=0;i<l.length;i++){ if(l[i].head) continue; if(!filter||filter(l[i],i)) out.push(i); } return out; }
 function rangeIndices(kind){
   var l=phrases(), cur=l[ST.idx];
-  if(kind==='ab') return bodyIdx(function(p,i){ return i>=SP.abA && i<=SP.abB; });
-  if(kind==='one' || (kind==='repeat' && ST.cfg.repeatScope!=='each')){ if(cur&&!cur.head) return [ST.idx]; return bodyIdx(function(p,i){ return i>ST.idx; }).slice(0,1); }
-  var r=ST.cfg.fileRange;
-  if(r==='sec' && cur) return bodyIdx(function(p){ return p.sec===cur.sec; });
-  if(r==='star'){ var st=prog().stars; return bodyIdx(function(p,i){ return !!st[i]; }); }
+  if(kind==='one'){ if(cur&&!cur.head) return [ST.idx]; return bodyIdx(function(p,i){ return i>ST.idx; }).slice(0,1); }
+  if(ST.cfg.fileRange==='sec' && cur) return bodyIdx(function(p){ return p.sec===cur.sec; });
   return bodyIdx();
 }
 function coverage(idxs){
@@ -1490,7 +1299,7 @@ function buildTrack(idxs, kind, onProg){
   return step().then(function(){
     if(!items.length) throw new Error('この範囲の音声ファイルがありません');
     var sr=AUD.sr||22050, gap=Math.round((+ST.cfg.gap||0)*sr);
-    var reps=kind==='repeat' ? Math.max(1,+ST.cfg.repeatN||1) : 1;
+    var reps=repN();
     var fac=+ST.cfg.silFactor||1, minSil=Math.round(0.7*sr), lead=Math.round(0.15*sr);
     function sil(len){ return kind==='shadow' ? Math.max(minSil, Math.round(len*fac)) : 0; }
     var total=lead;
@@ -1511,15 +1320,12 @@ function curSeg(t){
   while(lo<=hi){ var mid=(lo+hi)>>1; if(m[mid].s-0.06<=t){ k=mid; lo=mid+1; } else hi=mid-1; }
   return k;
 }
-/* 再生位置 → 画面のフレーズ・練習回数・ロック画面の表示 */
+/* 再生位置 → 画面のフレーズ・ロック画面の表示 */
 function syncFromAudio(force){
   if(!AUD.url || !AUD.map.length) return;
   var a=AUD.el, t=a.currentTime;
   if(t<AUD.lastT-1) AUD.lastT=0;   /* ループで先頭に戻った */
-  if(t>AUD.lastT){
-    for(var k=0;k<AUD.map.length;k++){ var m=AUD.map[k]; if(m.e>AUD.lastT && m.e<=t) bump(m.i); }
-    AUD.lastT=t;
-  }
+  if(t>AUD.lastT) AUD.lastT=t;
   var k=curSeg(t), seg=AUD.map[k];
   if(seg && (seg.i!==ST.idx || k!==AUD.curK || force)){
     var moved=(seg.i!==ST.idx);
@@ -1556,7 +1362,7 @@ function waitMeta(a){
 function filePlay(kind, after){
   var s=activeScript(); if(!s) return Promise.resolve();
   var idxs=rangeIndices(kind);
-  if(!idxs.length){ setSpeakState(kind==='ab'?'A-B 区間にフレーズがありません。':'再生する範囲にフレーズがありません（★ が1つもない等）。'); return Promise.resolve(); }
+  if(!idxs.length){ setSpeakState('再生する範囲にフレーズがありません。'); return Promise.resolve(); }
   var c=coverage(idxs);
   if(!c.have){ setSpeakState('この範囲の音声ファイルがありません。「原稿」タブで音声ZIPを取り込んでください。'); return Promise.resolve(); }
   try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
@@ -1567,7 +1373,7 @@ function filePlay(kind, after){
     var a=audEl();
     if(AUD.url){ try{ URL.revokeObjectURL(AUD.url); }catch(e){} }
     AUD.url=URL.createObjectURL(tr.blob); AUD.map=tr.map; AUD.kind=kind; AUD.after=after||null;
-    AUD.sig=trackSig(kind); AUD.repN=(kind==='repeat')?repN():1; AUD.curK=-1;
+    AUD.sig=trackSig(kind); AUD.repN=repN(); AUD.curK=-1;
     applyLoop(kind);
     a.src=AUD.url; try{ a.load(); }catch(e){}
     return waitMeta(a).then(function(){
@@ -1581,8 +1387,8 @@ function filePlay(kind, after){
       return a.play();
     }).then(function(){
       wakeOn(); mediaMeta(); posState();
-      setSpeakState(KIND_L[kind]+(kind==='repeat'?(ST.cfg.repeatScope==='each'?'（各フレーズ '+repN()+' 回ずつ）':'（このフレーズを '+repN()+' 回）'):'')
-        +((kind==='repeat'&&ST.cfg.repeatScope!=='each')?'':' ・ '+(kind==='ab'?'A〜B':kind==='one'?'このフレーズ':RANGE_L[ST.cfg.fileRange]))
+      setSpeakState(KIND_L[kind]+(repN()>1?'（各フレーズ '+repN()+' 回）':'')
+        +(kind==='one'?'':' ・ '+RANGE_L[ST.cfg.fileRange])
         +' ・ 全体 '+mmss(tr.dur*1000/(+ST.cfg.rate||1))
         +(tr.missing?'（未生成 '+tr.missing+' 件はスキップ）':''));
     });
@@ -1593,16 +1399,14 @@ function filePlay(kind, after){
   })
   .then(function(){ AUD.building=false; renderPractice(); });
 }
-/* ループ：A-B は常に、通し・シャドー・各フレーズのリピートは「最初に戻って繰り返す」が ON のとき */
+/* ループ：通し・シャドーイングは「最後まで行ったら最初に戻って繰り返す」が ON のとき */
 function applyLoop(kind){
   var a=AUD.el; if(!a) return; kind=kind||AUD.kind;
-  a.loop = kind==='ab' || (!!ST.cfg.loopAll && (kind==='seq'||kind==='shadow'||(kind==='repeat'&&ST.cfg.repeatScope==='each')));
+  a.loop = !!ST.cfg.loopAll && (kind==='seq'||kind==='shadow');
 }
 /* トラックの組み立て条件。これが変わったら作り直す */
 function trackSig(kind){
-  var one = kind==='one' || (kind==='repeat' && ST.cfg.repeatScope!=='each');
-  return JSON.stringify({k:kind, n:kind==='repeat'?repN():1, sc:ST.cfg.repeatScope, g:+ST.cfg.gap, f:+ST.cfg.silFactor,
-    r:ST.cfg.fileRange, a:SP.abA, b:SP.abB, s:ST.activeId, i:one?ST.idx:null});
+  return JSON.stringify({k:kind, n:repN(), g:+ST.cfg.gap, f:+ST.cfg.silFactor, r:ST.cfg.fileRange, s:ST.activeId, i:kind==='one'?ST.idx:null});
 }
 /* 再生中に設定を変えたら、いまのフレーズの頭から作り直して続ける（スライダーは少し待ってから） */
 function rebuildSoon(){
@@ -1627,26 +1431,11 @@ function fileButton(kind){
   }
   filePlay(kind);
 }
-/* 録音と手本の聞き比べ（音声ファイル方式） */
-function fileCompare(){
-  if(!REC.url){ setSpeakState('録音がありません。「● 録音」で録音してください。'); return; }
-  audUnlock(); if(SP.mode) stopSpeak();
-  filePlay('one', function(){
-    var a=AUD.el, rec=REC.url;
-    setTimeout(function(){
-      if(AUD.url){ try{ URL.revokeObjectURL(AUD.url); }catch(e){} }
-      AUD.url=null; AUD.map=[]; AUD.kind=null;
-      a.loop=false; a.src=rec; var p=a.play(); if(p&&p.catch) p.catch(function(){});
-      setSpeakState('手本 → 自分の声');
-    }, 350);
-  });
-}
 /* 最初から／セクションの頭へ。再生中ならそこから再生を続ける */
 function secHead(){ var l=phrases(), cur=l[ST.idx]; if(!cur) return null; for(var i=0;i<l.length;i++){ if(l[i].sec===cur.sec && !l[i].head) return i; } return firstBody(activeScript()); }
 function goStart(target, forcePlay){
   if(target==null) return;
   SP.atEnd=false; AUD.atEnd=false;
-  if(SP.abA!=null && (target<SP.abA || target>SP.abB)) SP.abA=SP.abB=null;
   if(isFile()){
     var a=AUD.el, loaded=!!AUD.url, wasPlaying=loaded && a && !a.paused, kind=AUD.kind;
     if(loaded){
@@ -1659,12 +1448,12 @@ function goStart(target, forcePlay){
       stopAudio();
     }
     ST.idx=target; save(); renderPractice();
-    if(wasPlaying||forcePlay){ audUnlock(); filePlay(kind && kind!=='ab' ? kind : (ST.cfg.autoNext?'seq':'one')); }
+    if(wasPlaying||forcePlay){ audUnlock(); filePlay(kind || (ST.cfg.autoNext?'seq':'one')); }
     return;
   }
   var kind2=SP.mode, was=!!SP.mode;
   stopSpeak(); ST.idx=target; save(); renderPractice();
-  if(was && kind2!=='ab') ttsStart(kind2);
+  if(was) ttsStart(kind2);
   else if(forcePlay) ttsStart(SP.lastKind||'seq');
 }
 /* 目次などからのジャンプ。再生中のトラックがあればその位置へ移動する */
@@ -1797,14 +1586,13 @@ function diagnoseAudio(K, meta){
   if(alt && alt.have>tgt.have) res.alt=alt;
   return res;
 }
-/* 原稿を指定の設定で分割し直す（ID は保つ。練習回数・★はフレーズ番号が変わるのでリセット） */
+/* 原稿を指定の設定で分割し直す（ID は保つ） */
 function resplitScript(sc, o){
   ST.cfg.maxWords=o.maxWords; ST.cfg.splitNum=o.num; ST.cfg.splitPrio=o.prio; ST.cfg.rdNuclide=o.nuclide; ST.cfg.rdUnit=o.unit;
   try{ $('maxWords').value=String(o.maxWords); $('splitNum').checked=o.num; $('splitPrio').checked=o.prio; $('rdNuclide').checked=o.nuclide; $('rdUnit').checked=o.unit; }catch(e){}
   var built=buildScript(sc.name, sc.raw); built.id=sc.id;
   for(var i=0;i<ST.scripts.length;i++) if(ST.scripts[i].id===sc.id) ST.scripts[i]=built;
-  var old=ST.prog[sc.id]; ST.prog[sc.id]={counts:{},stars:{},secTime:{},total:(old&&old.total)||0};
-  ST.activeId=sc.id; ST.idx=firstBody(built); SP.abA=SP.abB=null;
+  ST.activeId=sc.id; ST.idx=firstBody(built);
   stopAudio(); save(); AUD.cov=null; renderAll();
   return built;
 }
@@ -1823,10 +1611,10 @@ function afterImport(r){
       +'「1フレーズの最大語数：'+splitLabel(o.maxWords)+'」'+(rdDiff?'（読み替え設定も異なる）':'')+' で分割して作られています。\n'
       +'いまの原稿は「'+splitLabel(curMw)+'」で分割されているため、音声が '+d.target.have+' / '+d.target.total+' 件しか対応していません。\n\n'
       +'同じ設定で分割し直すと、'+d.alt.have+' / '+d.alt.total+' 件の音声が使えます。分割し直しますか？\n'
-      +'（この原稿の手動の結合・分割、練習回数、★ はリセットされます）';
+      +'（この原稿の手動の結合・分割はリセットされます）';
     if(confirm(q)){ resplitScript(d.target.sc, o); note='\n原稿「'+d.target.sc.name+'」を「'+splitLabel(o.maxWords)+'」で分割し直し、選択しました。'; }
   } else if(d.target && d.target.have>0 && d.target.sc.id!==ST.activeId){
-    stopAudio(); ST.activeId=d.target.sc.id; ST.idx=firstBody(d.target.sc); SP.abA=SP.abB=null; save(); AUD.cov=null; renderAll();
+    stopAudio(); ST.activeId=d.target.sc.id; ST.idx=firstBody(d.target.sc); save(); AUD.cov=null; renderAll();
     note='\n対応する原稿「'+d.target.sc.name+'」に切り替えました。';
   }
   var lines=ST.scripts.map(function(sc){ var c=scriptCoverage(sc); return '・'+sc.name+'：'+c.have+' / '+c.total+(sc.id===ST.activeId?'（選択中）':''); });
@@ -1888,39 +1676,17 @@ function importAudioFiles(files){
 }
 
 /* =========================================================================
-   5. タイマー
+   5. 見回り（再生していなければ Wake Lock を解放）
    ========================================================================= */
-var TM={ t0:Date.now(), secStart:Date.now(), curSec:-1 };
-function tickClock(){
-  var el2=$('hdrClock'); if(!el2) return;
-  var p=prog();
-  var elapsed=(p.total||0)+(Date.now()-TM.t0);
-  var tgt=(+ST.cfg.targetMin||0)*60000;
-  el2.textContent = mmss(Date.now()-TM.t0) + (tgt? ' / '+mmss(tgt) : '');
+function wlTick(){
   if(WL.want && !SP.mode && !AUD.building && !(AUD.url && AUD.el && !AUD.el.paused)) wakeOff();
-  var ts=$('timeStat');
-  if(ts) ts.textContent='今回の経過 '+mmss(Date.now()-TM.t0)+' ／ 累計 '+mmss(elapsed)
-    + (tgt? '（目標 '+mmss(tgt)+'、累計で '+Math.round(elapsed/tgt*100)+'%）':'');
 }
-function accumSec(){
-  var p=prog();
-  if(TM.curSec>=0){
-    p.secTime[TM.curSec]=(p.secTime[TM.curSec]||0)+(Date.now()-TM.secStart);
-  }
-  TM.secStart=Date.now();
-}
-function onSecChange(s){
-  if(s===TM.curSec) return;
-  accumSec(); TM.curSec=s;
-}
-window.addEventListener('pagehide', function(){
-  var p=prog(); p.total=(p.total||0)+(Date.now()-TM.t0); accumSec(); save();
-});
+window.addEventListener('pagehide', function(){ save(); });
 document.addEventListener('visibilitychange', function(){
   if(document.hidden){
     /* 読み上げ方式はロック・アプリ切替で iOS に止められる。中途半端に固まらないよう自分で止めておく */
     if(SP.mode){ SP.interrupted=true; stopSpeak(); }
-    var p=prog(); p.total=(p.total||0)+(Date.now()-TM.t0); accumSec(); save(); TM.t0=Date.now();
+    save();
   } else {
     SP.primed=false;  /* 復帰後に再度プライムが必要になることがある */
     if(SP.interrupted){
@@ -1936,23 +1702,10 @@ document.addEventListener('visibilitychange', function(){
 /* =========================================================================
    6. 描画
    ========================================================================= */
-function maskText(t){
-  var mode=ST.cfg.maskMode;
-  if(mode==='full') return t;
-  if(mode==='none') return t.replace(/[^\s]/g,'•');
-  /* key: 長い語・大文字始まり・数字を残し、他は伏せる */
-  return t.split(/(\s+)/).map(function(w){
-    if(/^\s+$/.test(w)) return w;
-    var core=w.replace(/[^A-Za-z0-9'’-]/g,'');
-    var keep = core.length>=6 || /^[A-Z]/.test(core) || /\d/.test(core);
-    return keep ? w : w.replace(/[A-Za-z]/g,'_');
-  }).join('');
-}
 function renderPractice(){
   var list=phrases(), ph=list[ST.idx]||null, s=activeScript();
   $('hdrScript').textContent = s ? s.name : '原稿なし';
   var pEl=$('phrase');
-  pEl.classList.toggle('masked', ST.cfg.maskMode!=='full');
 
   var inner=$('phraseInner');
   if(!inner){ inner=el('div'); inner.id='phraseInner'; pEl.innerHTML=''; pEl.appendChild(inner); }
@@ -1962,21 +1715,17 @@ function renderPractice(){
     $('phraseJa').style.display='none';
     return;
   }
-  onSecChange(ph.sec);
-
+  /* 長い文は文字を小さく（20語超／30語超） */
+  var nw=wc(ph.t);
+  pEl.classList.toggle('len-m', nw>20 && nw<=30); pEl.classList.toggle('len-l', nw>30);
   /* 単語スパン（ハイライト用に文字位置を保持） */
   inner.innerHTML='';
-  var shown=maskText(ph.t), idx=0;
-  if(ST.cfg.maskMode==='full'){
-    var tokens=ph.t.split(/(\s+)/);
-    tokens.forEach(function(tk){
-      if(/^\s+$/.test(tk)){ inner.appendChild(document.createTextNode(tk)); idx+=tk.length; return; }
-      var sp=el('span','w',tk); sp.dataset.a=idx; sp.dataset.b=idx+tk.length;
-      inner.appendChild(sp); idx+=tk.length;
-    });
-  } else {
-    inner.appendChild(document.createTextNode(shown));
-  }
+  var idx=0;
+  ph.t.split(/(\s+)/).forEach(function(tk){
+    if(/^\s+$/.test(tk)){ inner.appendChild(document.createTextNode(tk)); idx+=tk.length; return; }
+    var sp=el('span','w',tk); sp.dataset.a=idx; sp.dataset.b=idx+tk.length;
+    inner.appendChild(sp); idx+=tk.length;
+  });
 
   var ja=$('phraseJa');
   if(ST.cfg.showJa && ph.ja){ ja.textContent=ph.ja; ja.style.display='block'; } else { ja.style.display='none'; }
@@ -1984,31 +1733,23 @@ function renderPractice(){
   var secTitle = s && s.secTitles[ph.sec] ? s.secTitles[ph.sec] : '';
   $('secLabel').textContent = (ph.sec+1)+'/'+((s&&s.secTitles.length)||1)+'　'+secTitle;
 
-  var p=prog(), m=$('meta'); m.innerHTML='';
+  var m=$('meta'); m.innerHTML='';
   if(ph.label) m.appendChild(el('span','chip pri',ph.label));
   if(ph.head)  m.appendChild(el('span','chip','見出し'));
   m.appendChild(el('span','chip',(ST.idx+1)+' / '+list.length));
   m.appendChild(el('span','chip',wc(ph.t)+' 語'));
-  m.appendChild(el('span','chip','練習 '+(p.counts[ST.idx]||0)+' 回'));
-  if(p.stars[ST.idx]) m.appendChild(el('span','chip','★ 苦手'));
   if(isRead(ph.t)) m.appendChild(el('span','chip','読み替えあり'));
-  if(SP.abA!=null) m.appendChild(el('span','chip','A='+(SP.abA+1)+(SP.abB!=null?' B='+(SP.abB+1):'')));
-  if(isFile() && AUD.url && AUD.kind==='repeat' && AUD.map.length){
+  /* 何回目か（リピート回数が2回以上で再生中のとき） */
+  if(isFile() && AUD.url && AUD.repN>1 && AUD.map.length){
     var sg=AUD.map[curSeg(AUD.el.currentTime)];
     if(sg && sg.i===ST.idx) m.appendChild(el('span','chip pri','リピート '+(sg.r+1)+' / '+AUD.repN));
-  } else if(!isFile() && SP.mode==='repeat'){
+  } else if(!isFile() && SP.mode && !ph.head && repN()>1){
     m.appendChild(el('span','chip pri','リピート '+Math.min(SP.repDone+1,repN())+' / '+repN()));
   }
-  if(REC.on) m.appendChild(el('span','chip pri','● 録音中'));
 
   $('bar').firstChild.style.width = (list.length? (ST.idx+1)/list.length*100 : 0)+'%';
-  $('btnPlay').textContent = (SP.mode==='seq')? '■ 停止' : (SP.atEnd ? '↺ もう一度（最初から）' : '▶ 読み上げ');
-  $('btnStar').classList.toggle('on', !!p.stars[ST.idx]);
+  $('btnPlay').textContent = (SP.mode==='seq'||SP.mode==='one')? '■ 停止' : (SP.atEnd ? '↺ もう一度（最初から）' : '▶ 読み上げ');
   $('btnShadow').classList.toggle('on', SP.mode==='shadow');
-  $('btnRec').classList.toggle('on', REC.on);
-  $('btnAB').classList.toggle('on', SP.mode==='ab');
-  $('btnPlayRec').disabled = !REC.url;
-  $('btnCompare').disabled = !REC.url;
   $('btnPrev').disabled = ST.idx<=0;
   $('btnNext').disabled = ST.idx>=list.length-1;
   renderMode();
@@ -2019,7 +1760,7 @@ function renderMode(){
   for(var i=0;i<segs.length;i++) segs[i].classList.toggle('on', segs[i].dataset.pm===ST.cfg.playMode);
   var fo=$('fileOpts'), fs=$('fileStatus');
   if(fo) fo.style.display=f?'block':'none';
-  if(!f){ $('btnPlay').disabled=false; $('btnRepeat').classList.toggle('on', SP.mode==='repeat'); }
+  if(!f){ $('btnPlay').disabled=false; }
   if(!fs) return;
   fs.style.display=f?'block':'none';
   if(!f) return;
@@ -2027,15 +1768,13 @@ function renderMode(){
   var t='音声ファイル：この原稿 '+c.total+' フレーズ中 '+c.have+' 件あり';
   if(!c.have) t+='\n→「原稿」タブの「音声ファイル」で準備してください';
   else if(c.have<c.total) t+='（未生成 '+(c.total-c.have)+' 件は再生時にスキップ）';
-  if(loaded) t+='\n'+(playing?'再生中':'一時停止中')+'：'+(KIND_L[AUD.kind]||'')+(AUD.kind==='repeat'?(ST.cfg.repeatScope==='each'?'（各フレーズ '+AUD.repN+' 回ずつ）':'（このフレーズを '+AUD.repN+' 回）'):'')
-    +((AUD.kind==='repeat'&&ST.cfg.repeatScope!=='each')?'':' ・ '+(AUD.kind==='ab'?'A〜B':AUD.kind==='one'?'このフレーズ':(RANGE_L[ST.cfg.fileRange]||'')));
+  if(loaded) t+='\n'+(playing?'再生中':'一時停止中')+'：'+(KIND_L[AUD.kind]||'')+(AUD.repN>1?'（各フレーズ '+AUD.repN+' 回）':'')
+    +(AUD.kind==='one'?'':' ・ '+(RANGE_L[ST.cfg.fileRange]||''));
   fs.textContent=t;
   var pk=(AUD.kind==='seq'||AUD.kind==='one');
   $('btnPlay').textContent = AUD.building ? '準備中…' : ((loaded && AUD.atEnd && !playing) ? '↺ もう一度（最初から）' : (playing&&pk ? '‖ 一時停止' : (loaded&&pk ? '▶ 再開' : '▶ 再生')));
   $('btnPlay').disabled = AUD.building || !c.have;
   $('btnShadow').classList.toggle('on', loaded && AUD.kind==='shadow');
-  $('btnRepeat').classList.toggle('on', loaded && AUD.kind==='repeat');
-  $('btnAB').classList.toggle('on', loaded && AUD.kind==='ab');
   if(loaded){ $('btnPrev').disabled=false; $('btnNext').disabled=false; }
 }
 function nextPhrase(){ var l=phrases(); SP.atEnd=false; if(ST.idx<l.length-1){ ST.idx++; save(); renderPractice(); } }
@@ -2051,13 +1790,12 @@ function renderScriptList(){
     t.appendChild(el('div','note', s.secTitles.length+' セクション / '+s.phrases.length+' フレーズ / 最大語数：'+splitLabel(s.opt?s.opt.maxWords:12)));
     d.appendChild(t);
     var ops=el('div','ops');
-    var b1=el('button','btn sm','選択'); b1.onclick=function(ev){ ev.stopPropagation(); ST.activeId=s.id; ST.idx=firstBody(s); SP.abA=SP.abB=null; save(); renderAll(); go('practice'); };
+    var b1=el('button','btn sm','選択'); b1.onclick=function(ev){ ev.stopPropagation(); stopSpeak(); stopAudio(); ST.activeId=s.id; ST.idx=firstBody(s); save(); renderAll(); go('practice'); };
     var b2=el('button','btn sm','編集'); b2.onclick=function(ev){ ev.stopPropagation(); $('scName').value=s.name; $('scText').value=s.raw; $('scText').dataset.edit=s.id; window.scrollTo(0,0); };
     var b3=el('button','btn sm','削除'); b3.onclick=function(ev){
       ev.stopPropagation();
       if(!confirm('「'+s.name+'」を削除します。よろしいですか？')) return;
       ST.scripts=ST.scripts.filter(function(x){return x.id!==s.id;});
-      delete ST.prog[s.id];
       if(ST.activeId===s.id){ ST.activeId=ST.scripts.length?ST.scripts[0].id:null; ST.idx=firstBody(ST.scripts[0]); }
       save(); renderAll();
     };
@@ -2108,70 +1846,31 @@ function renderSplitEditor(){
     box.appendChild(d);
   });
 }
-var PH_FILTER='all';
 function renderToc(){
   var s=activeScript(), box=$('tocList'); box.innerHTML='';
   if(!s){ box.appendChild(el('p','note','原稿がありません。')); $('phList').innerHTML=''; return; }
-  var p=prog();
   s.secTitles.forEach(function(t,si){
-    var first=-1, cnt=0, done=0;
-    s.phrases.forEach(function(ph,i){ if(ph.sec===si){ if(first<0)first=i; cnt++; if(p.counts[i])done++; } });
+    var first=-1, cnt=0;
+    s.phrases.forEach(function(ph,i){ if(ph.sec===si){ if(first<0)first=i; if(!ph.head) cnt++; } });
     var d=el('div','item sec'+(s.phrases[ST.idx]&&s.phrases[ST.idx].sec===si?' cur':''));
     d.appendChild(el('div','n',(si+1)+'.'));
     var tt=el('div','t');
     tt.appendChild(el('div',null,t));
-    tt.appendChild(el('div','note', cnt+' フレーズ・練習済 '+done+' / 実測 '+mmss(p.secTime[si]||0)));
+    tt.appendChild(el('div','note', cnt+' フレーズ'));
     d.appendChild(tt);
     d.onclick=function(){ if(first>=0) jumpTo(first); };
     box.appendChild(d);
   });
   var pl=$('phList'); pl.innerHTML='';
   s.phrases.forEach(function(ph,i){
-    if(PH_FILTER==='star' && !p.stars[i]) return;
-    if(PH_FILTER==='un' && p.counts[i]) return;
     var d=el('div','item'+(i===ST.idx?' cur':''));
     d.appendChild(el('div','n',String(i+1)));
     d.appendChild(el('div','t',(ph.head?'【'+ph.t+'】':ph.t)));
-    if(p.stars[i]) d.appendChild(el('div','st','★'));
     d.onclick=function(){ jumpTo(i); };
     pl.appendChild(d);
   });
-  if(!pl.children.length) pl.appendChild(el('p','note','該当するフレーズはありません。'));
 }
-function renderRecord(){
-  var s=activeScript(), p=prog();
-  var box=$('recSummary'); box.innerHTML='';
-  if(!s){ box.appendChild(el('p','note','原稿がありません。')); $('recSections').innerHTML=''; $('recStars').innerHTML=''; return; }
-  var total=s.phrases.length, done=0, reps=0, stars=0;
-  for(var i=0;i<total;i++){ if(p.counts[i]){done++; reps+=p.counts[i];} if(p.stars[i])stars++; }
-  var tb=el('table','rec');
-  [['原稿',s.name],['フレーズ数',String(total)],['練習したフレーズ',done+' （'+(total?Math.round(done/total*100):0)+'%）'],
-   ['のべ練習回数',String(reps)],['★ 苦手',String(stars)],['累計練習時間',mmss((p.total||0)+(Date.now()-TM.t0))]]
-  .forEach(function(r){ var tr=el('tr'); tr.appendChild(el('th',null,r[0])); tr.appendChild(el('td','num',r[1])); tb.appendChild(tr); });
-  box.appendChild(tb);
-
-  var sb=$('recSections'); sb.innerHTML='';
-  var t2=el('table','rec');
-  var hr=el('tr'); ['#','セクション','実測'].forEach(function(h){ hr.appendChild(el('th',null,h)); }); t2.appendChild(hr);
-  s.secTitles.forEach(function(t,si){
-    var tr=el('tr'); tr.appendChild(el('td','num',String(si+1)));
-    tr.appendChild(el('td',null,t)); tr.appendChild(el('td','num',mmss(p.secTime[si]||0))); t2.appendChild(tr);
-  });
-  sb.appendChild(t2);
-
-  var st=$('recStars'); st.innerHTML='';
-  var any=false;
-  s.phrases.forEach(function(ph,i){
-    if(!p.stars[i]) return; any=true;
-    var d=el('div','item');
-    d.appendChild(el('div','n',String(i+1)));
-    d.appendChild(el('div','t',ph.t));
-    d.onclick=function(){ jumpTo(i); };
-    st.appendChild(d);
-  });
-  if(!any) st.appendChild(el('p','note','★ を付けたフレーズはまだありません。'));
-}
-function renderAll(){ AUD.cov=null; renderPractice(); renderAudioCard(); renderScriptList(); renderToc(); renderRecord(); if($('splitEditor').style.display!=='none') renderSplitEditor(); }
+function renderAll(){ AUD.cov=null; renderPractice(); renderAudioCard(); renderScriptList(); renderToc(); if($('splitEditor').style.display!=='none') renderSplitEditor(); }
 
 /* =========================================================================
    7. 画面遷移・イベント
@@ -2182,7 +1881,6 @@ function go(v){
   var bs=document.querySelectorAll('#tabbar button');
   for(var j=0;j<bs.length;j++) bs[j].classList.toggle('on', bs[j].dataset.v===v);
   if(v==='toc') renderToc();
-  if(v==='record') renderRecord();
   if(v==='script') renderScriptList();
   window.scrollTo(0,0);
 }
@@ -2206,15 +1904,15 @@ function afterCfg(key){
   if(key==='gap') $('vGap').textContent=(+ST.cfg.gap).toFixed(1);
   if(key==='theme') document.documentElement.setAttribute('data-theme',ST.cfg.theme);
   if(key==='fs') document.documentElement.setAttribute('data-fs',ST.cfg.fs);
-  if(key==='maskMode'||key==='showJa'||key==='wordHl') renderPractice();
+  if(key==='showJa'||key==='wordHl') renderPractice();
   if(key==='rdNuclide'||key==='rdUnit'){ AUD.cov=null; renderPractice(); renderAudioCard(); if($('rdPreview')) rdShow(); }
   if(key==='rate') applyRate();
   if(key==='keepAwake'){ if(ST.cfg.keepAwake){ if(WL.want) wakeOn(); } else { var w=WL.want; wakeOff(); WL.want=w; } }
   if(key==='lockText') mediaMeta();
-  if(key==='loopAll' || key==='repeatScope') applyLoop();
+  if(key==='loopAll') applyLoop();
   if(key==='fileRange') renderPractice();
-  if(key==='repeatN'||key==='repeatScope'||key==='gap'||key==='silFactor'||key==='fileRange') rebuildSoon();
-  if(key==='targetMin') tickClock();
+  if(key==='repeatN') renderPractice();
+  if(key==='repeatN'||key==='gap'||key==='silFactor'||key==='fileRange') rebuildSoon();
 }
 
 $('btnPlay').addEventListener('click', function(){
@@ -2224,7 +1922,8 @@ $('btnPlay').addEventListener('click', function(){
   }
   prime();
   if(SP.atEnd && !SP.mode){ goStart(firstBody(activeScript()), true); return; }
-  if(SP.mode==='seq'){ stopSpeak(); return; }
+  if(SP.mode==='seq'||SP.mode==='one'){ stopSpeak(); return; }
+  if(SP.mode) stopSpeak();
   if(ST.cfg.autoNext) playSeq(); else playOne();
 });
 function busy(){ return !!SP.mode || (AUD.url && AUD.el && !AUD.el.paused); }
@@ -2233,12 +1932,6 @@ $('btnSecTop').addEventListener('click', function(){ if(!isFile()) prime(); goSt
 $('btnStop').addEventListener('click', function(){ stopSpeak(); stopAudio(); setSpeakState(''); renderPractice(); });
 $('btnNext').addEventListener('click', function(){ if(isFile() && AUD.url){ seekPhrase(1); return; } prime(); stopSpeak(); nextPhrase(); });
 $('btnPrev').addEventListener('click', function(){ if(isFile() && AUD.url){ seekPhrase(-1); return; } prime(); stopSpeak(); prevPhrase(); });
-$('btnRepeat').addEventListener('click', function(){
-  if(isFile()){ fileButton('repeat'); return; }
-  prime();
-  if(SP.mode==='repeat'){ stopSpeak(); return; }
-  stopSpeak(); if(ST.cfg.repeatScope==='each') playRepeatEach(); else playRepeat();
-});
 $('btnShadow').addEventListener('click', function(){ if(isFile()){ fileButton('shadow'); return; } prime(); if(SP.mode==='shadow'){ stopSpeak(); return; } stopSpeak(); SP.stopFlag=false; playShadow(); });
 document.querySelectorAll('#modeSeg [data-pm]').forEach(function(b){
   b.addEventListener('click', function(){
@@ -2250,31 +1943,6 @@ document.querySelectorAll('#modeSeg [data-pm]').forEach(function(b){
       : '読み上げ方式：端末の音声合成で読み上げます（画面をロックすると止まります）。');
   });
 });
-$('btnStar').addEventListener('click', function(){
-  var p=prog(); if(p.stars[ST.idx]) delete p.stars[ST.idx]; else p.stars[ST.idx]=1;
-  save(); renderPractice(); renderRecord();
-});
-$('btnAB').addEventListener('click', function(){
-  if(isFile()) audUnlock(); else prime();
-  var abBusy = isFile() ? (AUD.kind==='ab' && !!AUD.url) : SP.mode==='ab';
-  if(abBusy){ stopSpeak(); stopAudio(); SP.abA=SP.abB=null; setSpeakState(''); renderPractice(); return; }
-  if(SP.abA==null){ SP.abA=ST.idx; setSpeakState('A を設定しました（'+(SP.abA+1)+'）。B にしたいフレーズでもう一度押してください。'); renderPractice(); return; }
-  if(SP.abB==null){
-    SP.abB=Math.max(ST.idx,SP.abA);
-    if(SP.abB===SP.abA){ setSpeakState('A と B が同じです。別のフレーズで押してください。'); SP.abB=null; return; }
-    if(isFile()) fileButton('ab'); else playAB();
-    return;
-  }
-  SP.abA=SP.abB=null; renderPractice();
-});
-$('btnMask').addEventListener('click', function(){
-  var order=['full','key','none'], i=order.indexOf(ST.cfg.maskMode);
-  ST.cfg.maskMode=order[(i+1)%3]; $('maskMode').value=ST.cfg.maskMode; save(); renderPractice();
-  setSpeakState({full:'全文を表示',key:'キーワードのみ表示',none:'非表示（音だけ）'}[ST.cfg.maskMode]);
-});
-$('btnRec').addEventListener('click', function(){ if(REC.on) stopRec(); else startRec(); });
-$('btnPlayRec').addEventListener('click', function(){ playRec(); });
-$('btnCompare').addEventListener('click', function(){ if(isFile()) fileCompare(); else compare(); });
 document.querySelectorAll('[data-rate]').forEach(function(b){
   b.addEventListener('click', function(){ ST.cfg.rate=+b.dataset.rate; $('rate').value=ST.cfg.rate; afterCfg('rate'); save(); });
 });
@@ -2292,8 +1960,8 @@ $('btnSaveScript').addEventListener('click', function(){
   } else {
     ST.scripts.push(built);
   }
-  ST.activeId=built.id; ST.idx=firstBody(built); SP.abA=SP.abB=null;
-  if(!ST.prog[built.id]) ST.prog[built.id]={counts:{},stars:{},secTime:{},total:0};
+  stopSpeak(); stopAudio();
+  ST.activeId=built.id; ST.idx=firstBody(built);
   if(save()){
     renderAll();
     alert('保存しました。\nセクション '+built.secTitles.length+' / フレーズ '+built.phrases.length);
@@ -2371,7 +2039,7 @@ $('btnReSplit').addEventListener('click', function(){
   if(!confirm('現在の原稿を再分割します。手動の結合／分割はリセットされます。')) return;
   var built=buildScript(s.name, s.raw); built.id=s.id;
   for(var i=0;i<ST.scripts.length;i++) if(ST.scripts[i].id===s.id) ST.scripts[i]=built;
-  ST.idx=firstBody(built); ST.prog[s.id]={counts:{},stars:{},secTime:{},total:(ST.prog[s.id]&&ST.prog[s.id].total)||0};
+  stopSpeak(); stopAudio(); ST.idx=firstBody(built);
   save(); renderAll(); renderSplitEditor();
   $('splitEditor').style.display='block';
 });
@@ -2380,9 +2048,6 @@ $('btnShowSplit').addEventListener('click', function(){
   if(e.style.display==='none'){ e.style.display='block'; renderSplitEditor(); e.scrollIntoView(); }
   else e.style.display='none';
 });
-$('fltAll').addEventListener('click',function(){PH_FILTER='all';renderToc();});
-$('fltStar').addEventListener('click',function(){PH_FILTER='star';renderToc();});
-$('fltUn').addEventListener('click',function(){PH_FILTER='un';renderToc();});
 
 $('voiceSel').addEventListener('change', function(){ ST.cfg.voiceURI=this.value; save(); });
 $('btnReloadVoices').addEventListener('click', function(){ prime(); SP.voices=[]; loadVoices(function(){ renderVoiceList(); setSpeakState('英語音声 '+enVoices().length+' 件を取得しました。'); }); });
@@ -2414,25 +2079,6 @@ $('btnRdSpeak').addEventListener('click', function(){
   prime(); var out=rdShow();
   if(out){ SP.hlOk=true; speakOne(out, function(){}); }
 });
-$('btnResetTimer').addEventListener('click', function(){
-  var p=prog(); p.total=0; p.secTime={}; TM.t0=Date.now(); TM.secStart=Date.now(); save(); tickClock(); renderRecord();
-});
-$('btnExport').addEventListener('click', function(){
-  var s=activeScript(), p=prog();
-  var data={app:'presen-speaking-practice', version:APP_VERSION, exportedAt:new Date().toISOString(),
-    script:s?{name:s.name, sections:s.secTitles, phraseCount:s.phrases.length}:null,
-    totalMs:(p.total||0)+(Date.now()-TM.t0), sectionMs:p.secTime, counts:p.counts, stars:p.stars};
-  dl('practice-record.json', JSON.stringify(data,null,2), 'application/json');
-});
-$('btnExportCsv').addEventListener('click', function(){
-  var s=activeScript(); if(!s){ alert('原稿がありません。'); return; }
-  var p=prog(), rows=[['no','section','phrase','words','count','star']];
-  s.phrases.forEach(function(ph,i){
-    rows.push([i+1, (s.secTitles[ph.sec]||''), ph.t, wc(ph.t), (p.counts[i]||0), (p.stars[i]?1:0)]);
-  });
-  var csv='﻿'+rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
-  dl('practice-record.csv', csv, 'text/csv');
-});
 function dl(name, text, type){
   try{
     var b=new Blob([text],{type:type}), u=URL.createObjectURL(b);
@@ -2441,18 +2087,6 @@ function dl(name, text, type){
     setTimeout(function(){ URL.revokeObjectURL(u); }, 4000);
   }catch(e){ showErr('書き出しに失敗: '+e.message); }
 }
-$('btnClear').addEventListener('click', function(){
-  if(!confirm('この端末に保存した原稿・練習記録・音声ファイルをすべて消去します。元に戻せません。よろしいですか？')) return;
-  try{ localStorage.removeItem(LSK); }catch(e){}
-  stopAudio();
-  var fin=function(){ location.reload(); };
-  try{
-    if(IDB.db){ IDB.db.close(); IDB.db=null; }
-    var rq=indexedDB.deleteDatabase('pps-audio');
-    rq.onsuccess=fin; rq.onerror=fin; rq.onblocked=fin; setTimeout(fin,2000);
-  }catch(e){ fin(); }
-});
-
 /* キーボード（iPad 外付けキーボード） */
 document.addEventListener('keydown', function(e){
   var tn=(e.target&&e.target.tagName)||'';
@@ -2460,10 +2094,7 @@ document.addEventListener('keydown', function(e){
   if(e.key===' '){ e.preventDefault(); $('btnPlay').click(); }
   else if(e.key==='ArrowRight'){ e.preventDefault(); $('btnNext').click(); }
   else if(e.key==='ArrowLeft'){ e.preventDefault(); $('btnPrev').click(); }
-  else if(e.key==='r'||e.key==='R'){ $('btnRepeat').click(); }
-  else if(e.key==='s'){ $('btnStar').click(); }
-  else if(e.key==='S'){ $('btnShadow').click(); }
-  else if(e.key==='h'||e.key==='H'){ $('btnMask').click(); }
+  else if(e.key==='s'||e.key==='S'){ $('btnShadow').click(); }
   else if(e.key==='Home'){ e.preventDefault(); $('btnTop').click(); }
 });
 
@@ -2515,24 +2146,24 @@ function init(){
   if(!ST.scripts.length){
     var s=buildScript('サンプル（中立・自作／機密情報なし）', SAMPLE);
     ST.scripts.push(s); ST.activeId=s.id; ST.idx=firstBody(s);
-    ST.prog[s.id]={counts:{},stars:{},secTime:{},total:0};
     save();
   }
   if(!activeScript() && ST.scripts.length){ ST.activeId=ST.scripts[0].id; ST.idx=firstBody(ST.scripts[0]); }
   var l=phrases(); if(ST.idx>=l.length) ST.idx=0;
 
   ['rate','pitch','vol','gap'].forEach(function(k){ bindCfg(k,k); });
-  bindCfg('repeatN','repeatN'); bindCfg('repeatScope','repeatScope'); bindCfg('silFactor','silFactor');
-  bindCfg('theme','theme'); bindCfg('fs','fs'); bindCfg('maskMode','maskMode');
-  bindCfg('maxWords','maxWords'); bindCfg('targetMin','targetMin');
+  bindCfg('repeatN','repeatN'); bindCfg('silFactor','silFactor');
+  bindCfg('theme','theme'); bindCfg('fs','fs');
+  bindCfg('maxWords','maxWords');
   bindCfg('autoNext','autoNext','chk'); bindCfg('speakHeads','speakHeads','chk');
-  bindCfg('autoRec','autoRec','chk'); bindCfg('loopAll','loopAll','chk'); bindCfg('showJa','showJa','chk');
+  bindCfg('loopAll','loopAll','chk'); bindCfg('showJa','showJa','chk');
   bindCfg('rdNuclide','rdNuclide','chk'); bindCfg('rdUnit','rdUnit','chk');
   bindCfg('keepAwake','keepAwake','chk'); bindCfg('lockText','lockText','chk');
   bindCfg('fileRange','fileRange'); bindCfg('macVoice','macVoice');
   $('rdRules').value=ST.cfg.rdRules||'';
   bindCfg('wordHl','wordHl','chk'); bindCfg('splitNum','splitNum','chk'); bindCfg('splitPrio','splitPrio','chk');
-  ['rate','pitch','vol','gap','theme','fs','targetMin'].forEach(afterCfg);
+  ['rate','pitch','vol','gap','theme','fs'].forEach(afterCfg);
+  if(!$('repeatN').value){ ST.cfg.repeatN=1; $('repeatN').value='1'; }
 
   if(synth){
     var o0=document.createElement('option'); o0.value=''; o0.textContent='\uff08\u97f3\u58f0\u3092\u53d6\u5f97\u4e2d\u2026\uff09';
@@ -2545,23 +2176,12 @@ function init(){
     $('voiceNote').textContent='この端末のブラウザは Web Speech API（読み上げ）に対応していません。iOS は Safari / Chrome で動作します。';
   }
 
-  var env=[];
-  env.push('プロトコル: '+location.protocol);
-  env.push('読み上げ: '+(synth?'対応':'非対応'));
-  env.push('録音: '+((navigator.mediaDevices&&window.MediaRecorder)?'対応':'非対応'));
-  env.push('Service Worker: '+('serviceWorker' in navigator ? '利用可' : '利用不可'));
-  env.push('Wake Lock: '+('wakeLock' in navigator ? '利用可' : '利用不可'));
-  env.push('ロック画面操作: '+('mediaSession' in navigator ? '利用可' : '利用不可'));
-  env.push('音声の保存: '+(window.indexedDB ? '利用可' : '利用不可'));
-  if(location.protocol!=='https:'&&location.hostname!=='localhost') env.push('※ https ではないため、録音とオフライン化が使えません。');
-  $('envNote').textContent=env.join(' ／ ');
-
   try{ AUD.silentUrl=URL.createObjectURL(wavBlob(new Int16Array(4410),22050)); }catch(e){}
   mediaSetup();
   renderAll();
   refreshKeys().then(function(){ renderPractice(); renderAudioCard(); })
     .catch(function(e){ IDB.keys=new Set(); renderAudioCard('音声の保存領域（IndexedDB）を開けませんでした: '+((e&&e.message)||e)); });
-  tickClock(); setInterval(tickClock, 1000);
+  setInterval(wlTick, 1000);
   document.addEventListener('touchstart', function once(){ prime(); document.removeEventListener('touchstart', once); }, {passive:true});
   document.addEventListener('click', function once(){ prime(); document.removeEventListener('click', once); });
 
